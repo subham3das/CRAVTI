@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Cravity - Reels</title>
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons+Round"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* --- 1. THEME --- */
+      :root {
+        --bg: #000;
+        --primary: #ff3f3f;
+        --neon-blue: #00f0ff;
+        --success: #00e676;
+        --gold: #ffd700;
+        --text: #fff;
+        --glass: rgba(20, 20, 20, 0.3);
+        --border: rgba(255, 255, 255, 0.1);
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
+
+      body {
+        background: #000;
+        font-family: "Plus Jakarta Sans", sans-serif;
+        color: var(--text);
+        display: flex;
+        justify-content: center;
+        height: 100dvh;
+        overflow: hidden;
+      }
+
+      .app-container {
+        width: 100%;
+        max-width: 414px;
+        height: 100%;
+        position: relative;
+        background: #000;
+        scroll-snap-type: y mandatory;
+        overflow-y: scroll;
+        scroll-behavior: smooth;
+        scrollbar-width: none;
+      }
+      .app-container::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* --- 2. REEL CONTAINER --- */
+      .reel-item {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        scroll-snap-align: start;
+        overflow: hidden;
+        background-size: cover;
+        background-position: center;
+      }
+
+      .video-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          180deg,
+          rgba(0, 0, 0, 0.4) 0%,
+          transparent 30%,
+          rgba(0, 0, 0, 0.2) 60%,
+          #000 100%
+        );
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      /* --- 3. HUD ELEMENTS --- */
+
+      /* Header */
+      .reel-header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        padding: 20px 20px;
+        z-index: 20;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+        margin-top: env(safe-area-inset-top);
+      }
+      .live-tag {
+        background: rgba(255, 63, 63, 0.2);
+        border: 1px solid var(--primary);
+        color: var(--primary);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-family: "JetBrains Mono";
+        font-size: 10px;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        backdrop-filter: blur(10px);
+      }
+      .live-pulse {
+        width: 6px;
+        height: 6px;
+        background: var(--primary);
+        border-radius: 50%;
+        animation: blink 1s infinite;
+      }
+
+      /* Right Sidebar */
+      .action-sidebar {
+        position: absolute;
+        right: 10px;
+        bottom: calc(115px + env(safe-area-inset-bottom));
+        z-index: 25;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        align-items: center;
+      }
+      .side-btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+      .side-btn:active {
+        transform: scale(0.9);
+      }
+
+      .icon-circle {
+        width: 45px;
+        height: 45px;
+        border-radius: 50%;
+        background: rgba(30, 30, 30, 0.6);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: 0.3s;
+      }
+      .icon-circle i {
+        font-size: 22px;
+        color: white;
+      }
+
+      .side-btn.liked .icon-circle {
+        background: rgba(255, 63, 63, 0.2);
+        border-color: var(--primary);
+      }
+      .side-btn.liked i {
+        color: var(--primary);
+        animation: pop 0.4s;
+      }
+
+      .side-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-shadow: 0 2px 4px black;
+      }
+
+      /* Flavor DNA Widget */
+      .flavor-dna {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        margin-bottom: 10px;
+        background: rgba(0, 0, 0, 0.6);
+        border: 2px solid var(--neon-blue);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+      }
+      .dna-icon {
+        font-size: 20px;
+        color: var(--neon-blue);
+        animation: pulse-neon 2s infinite;
+      }
+      .dna-tag {
+        position: absolute;
+        top: 10px;
+        right: 45px;
+        background: var(--neon-blue);
+        color: black;
+        font-size: 10px;
+        font-weight: 900;
+        padding: 2px 6px;
+        border-radius: 4px;
+        white-space: nowrap;
+        font-family: "JetBrains Mono";
+      }
+
+      /* Bottom Info Area */
+      .reel-content {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        padding: 20px 20px calc(95px + env(safe-area-inset-bottom)) 20px;
+        z-index: 15;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none; /* Let clicks pass through mostly */
+      }
+      
+      /* FIX: Allow clicks on specific interactive elements */
+      .creator-pill, .reel-desc, .cta-btn { pointer-events: auto; }
+
+      /* Creator Pill */
+      .creator-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4px 12px 4px 4px;
+        border-radius: 30px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        align-self: flex-start;
+        margin-bottom: 5px;
+        cursor: pointer;
+      }
+      .c-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+      }
+      .c-name {
+        font-size: 12px;
+        font-weight: 700;
+      }
+      
+      /* Follow Button */
+      .c-follow {
+        color: var(--neon-blue);
+        font-size: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        border: 1px solid var(--neon-blue);
+        padding: 2px 8px;
+        border-radius: 10px;
+        transition: 0.2s;
+        margin-left: 5px;
+        z-index: 20;
+      }
+      .c-follow.following {
+          background: var(--neon-blue);
+          color: #000;
+      }
+
+      .reel-title {
+        font-size: 16px;
+        font-weight: 800;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        line-height: 1.3;
+        width: 75%; 
+      }
+      .reel-desc {
+        font-size: 12px;
+        color: #ccc;
+        width: 75%;
+        text-shadow: 0 1px 2px black;
+        margin-bottom: 5px;
+      }
+      .highlight {
+        color: var(--primary);
+        font-weight: 700;
+      }
+
+      .audio-track {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 0px;
+        font-size: 11px;
+        font-family: "JetBrains Mono";
+        color: #ddd;
+      }
+      .viz-bar {
+        width: 3px;
+        height: 10px;
+        background: var(--success);
+        border-radius: 2px;
+        animation: equalizer 0.8s infinite ease-in-out;
+      }
+
+      /* CTA Button */
+      .cta-btn {
+        width: fit-content;
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid var(--primary);
+        padding: 5px 16px;
+        border-radius: 20px;
+        color: white;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 1px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        margin-top: 5px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+        transition: 0.2s;
+    
+      }
+      .cta-btn:active {
+        transform: scale(0.95);
+        background: var(--primary);
+      }
+
+      /* --- NAV DOCK --- */
+      .nav-dock {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 360px;
+        height: 75px;
+        background: rgba(10, 10, 10, 0.85);
+        backdrop-filter: blur(25px);
+        border-radius: 30px;
+        border: 1px solid var(--border);
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 10px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        z-index: 100;
+        margin-bottom: env(safe-area-inset-bottom);
+      }
+      .nav-btn {
+        width: 55px;
+        height: 55px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        transition: 0.3s;
+        text-decoration: none;
+      }
+      .nav-btn.active {
+        color: white;
+        background: rgba(255, 255, 255, 0.1);
+      }
+      .nav-btn span {
+        font-size: 28px;
+      }
+
+      /* --- MODALS --- */
+      #toast {
+        position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-100px);
+        background: rgba(255,255,255,0.15); color: white; padding: 8px 16px; border-radius: 20px; 
+        font-weight: 600; font-size: 12px; z-index: 2000; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+        backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); pointer-events: none; opacity: 0;
+      }
+      #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+      .comment-drawer {
+        position: fixed; bottom: 0; left: 0; width: 100%; height: 50%;
+        background: #111; border-radius: 30px 30px 0 0; z-index: 500;
+        transform: translateY(100%); transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); padding: 20px;
+        border-top: 1px solid var(--border); display: flex; flex-direction: column;
+      }
+      .comment-drawer.open { transform: translateY(0); }
+      
+      .cd-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+      .cd-header h3 { margin: 0; font-size: 16px; color: white; }
+      .cd-close { font-size: 24px; color: #666; cursor: pointer; }
+      .cd-list { flex: 1; overflow-y: auto; margin-bottom: 15px; scrollbar-width: none; }
+      .c-item { display: flex; gap: 10px; margin-bottom: 15px; font-size: 13px; }
+      .c-item img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+      .c-item div { color: #ccc; }
+      .c-item strong { color: white; margin-right: 5px; font-size: 12px; }
+      .cd-input-area { display: flex; gap: 10px; align-items: center; }
+      .cd-input { flex: 1; background: #222; border: 1px solid #444; color: white; padding: 12px; border-radius: 20px; outline: none; font-size: 14px; }
+      .cd-send { color: var(--primary); font-weight: 700; font-size: 12px; cursor: pointer; background: none; border: none; }
+
+      .options-modal {
+        position: fixed; bottom: 0; left: 0; width: 100%;
+        background: rgba(15, 15, 15, 0.95); backdrop-filter: blur(20px);
+        border-top: 1px solid var(--border); border-radius: 25px 25px 0 0;
+        padding: 20px; z-index: 600; transform: translateY(100%); transition: 0.3s;
+        display: flex; flex-direction: column; gap: 5px;
+      }
+      .options-modal.open { transform: translateY(0); }
+      .opt-btn { padding: 15px; text-align: left; background: rgba(255,255,255,0.05); border-radius: 12px; color: white; font-weight: 600; font-size: 14px; cursor: pointer; }
+      .opt-cancel { margin-top: 10px; text-align: center; background: transparent; color: #888; }
+
+      @keyframes blink { 50% { opacity: 0.3; } }
+      @keyframes pop { 0% { transform: scale(0.8); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+      @keyframes pulse-neon { 0% { opacity: 0.6; text-shadow: 0 0 10px var(--neon-blue); } 50% { opacity: 1; text-shadow: 0 0 20px var(--neon-blue); } 100% { opacity: 0.6; text-shadow: 0 0 10px var(--neon-blue); } }
+      @keyframes equalizer { 0% { height: 5px; } 50% { height: 15px; } 100% { height: 5px; } }
+    </style>
+  </head>
+  <body>
+    <div class="app-container" id="reel-container">
+      
+      <div
+        class="reel-item"
+        style="background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&q=80');"
+      >
+        <div class="video-overlay"></div>
+
+        <div class="reel-header">
+          <div class="live-tag"><div class="live-pulse"></div> TRENDING</div>
+          <span class="material-icons-round" style="color: white; cursor: pointer" onclick="toggleOptions()">more_vert</span>
+        </div>
+
+        <div class="action-sidebar">
+          <div class="flavor-dna">
+            <div class="dna-tag">SPICY</div>
+            <span class="material-icons-round dna-icon">local_fire_department</span>
+          </div>
+
+          <div class="side-btn" onclick="toggleLike(this)">
+            <div class="icon-circle"><i class="material-icons-round">favorite_border</i></div>
+            <span class="side-label">4.5k</span>
+          </div>
+
+          <div class="side-btn" onclick="toggleComments()">
+            <div class="icon-circle"><i class="material-icons-round">chat_bubble_outline</i></div>
+            <span class="side-label">240</span>
+          </div>
+
+          <div class="side-btn" onclick="shareReel()">
+            <div class="icon-circle"><i class="material-icons-round">send</i></div>
+            <span class="side-label">Share</span>
+          </div>
+        </div>
+
+        <div class="reel-content">
+          <div class="creator-pill" onclick="window.location.href='menu.html'">
+            <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=100" class="c-avatar" />
+            <span class="c-name">Taco Haus</span>
+            <span class="c-follow" onclick="toggleFollow(this, event)">Follow</span>
+          </div>
+
+          <div class="reel-title">The Neon Smashburger 🍔</div>
+          <div class="reel-desc">
+            Double patty, synth-cheese, and our secret <span class="highlight">Ghost Pepper</span> glaze.
+          </div>
+
+          <div class="audio-track">
+            <span class="material-icons-round" style="font-size: 14px">graphic_eq</span>
+            <span>Taco Haus Original Audio</span>
+            <div class="viz-bar" style="animation-delay: 0s"></div>
+            <div class="viz-bar" style="animation-delay: 0.2s"></div>
+            <div class="viz-bar" style="animation-delay: 0.4s"></div>
+          </div>
+
+          <button class="cta-btn" onclick="window.location.href='menu.html'">
+            <span class="material-icons-round">bolt</span> ORDER NOW
+          </button>
+        </div>
+      </div>
+
+      <div
+        class="reel-item"
+        style="background-image: url('https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=800&q=80');"
+      >
+        <div class="video-overlay"></div>
+        <div class="action-sidebar">
+          <div class="flavor-dna" style="border-color: var(--gold)">
+            <div class="dna-tag" style="background: var(--gold)">SWEET</div>
+            <span class="material-icons-round dna-icon" style="color: var(--gold)">icecream</span>
+          </div>
+          <div class="side-btn" onclick="toggleLike(this)"><div class="icon-circle"><i class="material-icons-round">favorite_border</i></div><span class="side-label">1.2k</span></div>
+          <div class="side-btn" onclick="toggleComments()"><div class="icon-circle"><i class="material-icons-round">chat_bubble_outline</i></div><span class="side-label">85</span></div>
+          <div class="side-btn" onclick="shareReel()"><div class="icon-circle"><i class="material-icons-round">send</i></div><span class="side-label">Share</span></div>
+        </div>
+        <div class="reel-content">
+          <div class="creator-pill" onclick="window.location.href='menu.html'">
+            <img src="https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=100" class="c-avatar" />
+            <span class="c-name">Urban Grind</span>
+            <span class="c-follow" onclick="toggleFollow(this, event)">Follow</span>
+          </div>
+          <div class="reel-title">Electric Limeade ⚡️</div>
+          <div class="reel-desc">The perfect summer cooler. Sugar rush guaranteed.</div>
+          <button class="cta-btn" onclick="window.location.href='menu.html'">
+            <span class="material-icons-round">local_drink</span> GET DRINK
+          </button>
+        </div>
+      </div>
+
+      <div class="nav-dock">
+        <a href="home.html" class="nav-btn"><span class="material-icons-round">grid_view</span></a>
+        <a href="explore.html" class="nav-btn"><span class="material-icons-round">explore</span></a>
+        <a href="#" class="nav-btn active" style="color: var(--primary)"><span class="material-icons-round">smart_display</span></a>
+        <a href="profile.html" class="nav-btn"><span class="material-icons-round">person</span></a>
+      </div>
+    </div>
+
+    <div id="toast">Notification</div>
+
+    <div class="comment-drawer" id="comments-ui">
+        <div class="cd-header"><h3>Comments</h3><span class="material-icons-round cd-close" onclick="toggleComments()">close</span></div>
+        <div class="cd-list" id="comment-list">
+            <div class="c-item"><img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100"><div><strong>Mike</strong>Looks fire! 🔥</div></div>
+            <div class="c-item"><img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100"><div><strong>Sarah</strong>Need this ASAP</div></div>
+        </div>
+        <div class="cd-input-area"><input type="text" class="cd-input" id="c-input" placeholder="Add a comment..."><button class="cd-send" onclick="postComment()">POST</button></div>
+    </div>
+
+    <div class="options-modal" id="options-ui">
+        <div class="opt-btn" onclick="showToast('Reported'); toggleOptions()">Report Content</div>
+        <div class="opt-btn" onclick="showToast('Not Interested'); toggleOptions()">Not Interested</div>
+        <div class="opt-btn" onclick="shareReel(); toggleOptions()">Copy Link</div>
+        <div class="opt-btn opt-cancel" onclick="toggleOptions()">Cancel</div>
+    </div>
+
+    <script>
+      function toggleLike(el) {
+        el.classList.toggle("liked");
+        const icon = el.querySelector("i");
+        if (el.classList.contains("liked")) { icon.innerText = "favorite"; if (navigator.vibrate) navigator.vibrate(50); } else { icon.innerText = "favorite_border"; }
+      }
+      
+      function toggleFollow(btn, event) {
+          if(event) event.stopPropagation();
+          btn.classList.toggle('following');
+          if(btn.classList.contains('following')) {
+              btn.innerText = 'Following';
+              btn.style.background = 'var(--neon-blue)';
+              btn.style.color = '#000';
+              if(navigator.vibrate) navigator.vibrate(20);
+          } else {
+              btn.innerText = 'Follow';
+              btn.style.background = 'transparent';
+              btn.style.color = 'var(--neon-blue)';
+          }
+      }
+      
+      function shareReel() { showToast("Link Copied 🔗"); if(navigator.vibrate) navigator.vibrate(50); }
+      function showToast(msg) { const t = document.getElementById('toast'); t.innerText = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); }
+      function toggleComments() { document.getElementById('comments-ui').classList.toggle('open'); }
+      function toggleOptions() { document.getElementById('options-ui').classList.toggle('open'); }
+      
+      function postComment() {
+          const input = document.getElementById('c-input'); const text = input.value.trim();
+          if(!text) return;
+          const list = document.getElementById('comment-list');
+          const newItem = `<div class="c-item" style="animation:pop 0.3s"><img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"><div><strong>You</strong>${text}</div></div>`;
+          list.insertAdjacentHTML('beforeend', newItem); input.value = ''; list.scrollTop = list.scrollHeight;
+      }
+    </script>
+  </body>
+</html>

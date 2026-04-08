@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cravity - Profile</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 1. CORE THEME --- */
+        :root {
+            --bg: #000;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+            --primary: #FF3F3F;
+            --gold: #FFD700;
+            --text: #FFF;
+            --neon-blue: #00F0FF;
+            --muted: #8899a6;
+            --success: #00E676;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background: #000; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text);
+            display: flex; justify-content: center; height: 100vh; overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%; max-width: 414px; height: 100%; position: relative;
+            background: radial-gradient(circle at 50% 0%, #111 0%, #000 80%);
+            overflow-y: scroll; scroll-behavior: smooth; scrollbar-width: none; 
+        }
+        .app-container::-webkit-scrollbar { display: none; }
+
+        /* --- 2. HEADER --- */
+        header {
+            padding: 20px 25px; display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 20; background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+        }
+        .settings-icon { opacity: 0.7; font-size: 24px; cursor: pointer; transition: 0.3s; }
+        .settings-icon:hover { transform: rotate(90deg); opacity: 1; }
+
+        /* --- 3. PROFILE INFO --- */
+        .profile-section { padding: 0 25px; text-align: center; margin-bottom: 25px; }
+        .avatar-container { position: relative; width: 90px; height: 90px; margin: 0 auto 10px auto; }
+        .avatar { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.1); padding: 3px; }
+        .edit-badge {
+            position: absolute; bottom: 0; right: 0; width: 28px; height: 28px;
+            background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            border: 3px solid #000; cursor: pointer;
+        }
+        .user-name { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+        .user-bio { color: var(--muted); font-size: 12px; font-weight: 500; }
+
+        .mini-stats { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+        .ms-item { background: rgba(255,255,255,0.05); padding: 5px 12px; border-radius: 20px; font-size: 10px; font-family: 'JetBrains Mono'; border: 1px solid var(--border); }
+        .ms-val { color: var(--gold); font-weight: 800; }
+
+        /* --- 4. MEMBER CARD (Updated Link) --- */
+        .card-stage { perspective: 1000px; padding: 0 25px; margin-bottom: 20px; }
+        .member-card {
+            width: 100%; height: 170px; border-radius: 20px;
+            background: linear-gradient(135deg, #1a1a1a 0%, #000 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3); position: relative; overflow: hidden;
+            display: flex; flex-direction: column; justify-content: space-between; padding: 20px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.5); transform-style: preserve-3d; will-change: transform;
+            cursor: pointer; /* Added pointer */
+        }
+        .card-glare { position: absolute; inset: -100%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); pointer-events: none; mix-blend-mode: overlay; }
+        .card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .card-logo { font-family: 'JetBrains Mono'; font-weight: 800; color: var(--gold); letter-spacing: 1px; font-size: 12px; }
+        .card-points { font-family: 'JetBrains Mono'; font-size: 28px; font-weight: 700; color: white; text-shadow: 0 0 20px rgba(255,255,255,0.3); }
+        .card-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+        .level { color: var(--gold); font-size: 10px; font-weight: 700; border: 1px solid var(--gold); padding: 4px 8px; border-radius: 12px; }
+
+        /* --- 5. ACTION GRID --- */
+        .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 25px; margin-bottom: 25px; }
+        .action-card {
+            background: var(--glass); border: 1px solid var(--border); border-radius: 15px;
+            padding: 12px; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: pointer; transition: 0.2s; text-decoration: none;
+        }
+        .action-card:active { transform: scale(0.95); border-color: var(--primary); }
+        .ac-icon { font-size: 22px; margin-bottom: 5px; color: var(--text); }
+        .ac-label { font-size: 9px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* --- 6. ACTIVE MISSIONS --- */
+        .section-header { padding: 0 25px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .task-preview { padding: 0 25px; margin-bottom: 30px; }
+        .task-item {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+            border-radius: 12px; padding: 10px 15px; display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 8px; cursor: pointer;
+        }
+        .task-info h4 { font-size: 12px; margin-bottom: 2px; }
+        .task-info p { font-size: 10px; color: #888; font-family: 'JetBrains Mono'; }
+        .task-reward { color: var(--gold); font-weight: 700; font-size: 10px; border: 1px solid var(--gold); padding: 2px 6px; border-radius: 4px; }
+
+        /* --- 7. TABS --- */
+        .tabs { 
+            display: flex; border-bottom: 1px solid var(--border); margin-bottom: 0; 
+            position: relative; background: #000; z-index: 10; 
+        }
+        .tab { flex: 1; text-align: center; padding: 15px; cursor: pointer; color: var(--muted); position: relative; transition: 0.3s; }
+        .tab span { font-size: 20px; }
+        .tab.active { color: white; }
+        .tab.active::after { content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 40px; height: 3px; background: var(--primary); border-radius: 3px 3px 0 0; }
+
+        .content-area { min-height: 500px; padding-bottom: 120px; background: #000; }
+
+        /* --- VIEW 1: FEED --- */
+        .feed-container { display: flex; flex-direction: column; }
+        .feed-post { border-bottom: 1px solid var(--border); padding: 15px 20px; display: flex; gap: 12px; animation: fadeIn 0.3s; }
+        .fp-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 1px solid #333; }
+        .fp-body { flex: 1; }
+        .fp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+        .fp-user { font-size: 14px; font-weight: 700; color: white; }
+        .fp-handle { font-size: 13px; color: var(--muted); font-weight: 400; font-family: 'JetBrains Mono'; margin-left: 4px; }
+        .fp-time { font-size: 12px; color: var(--muted); }
+        .fp-text { font-size: 14px; color: #eee; margin-bottom: 10px; line-height: 1.4; font-weight: 400; }
+        .fp-media { width: 100%; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+        .fp-img { width: 100%; display: block; }
+        .fp-actions { display: flex; justify-content: space-between; max-width: 80%; padding-top: 5px; }
+        .fp-act { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 12px; cursor: pointer; transition: 0.2s; }
+        .fp-act:hover.like { color: #F91880; }
+        .fp-act:hover.comment { color: var(--neon-blue); }
+        .fp-act:hover.share { color: var(--gold); }
+
+        /* --- VIEW 2: UPDATED TICKETS --- */
+        .ticket-list { padding: 25px; display: none; }
+        
+        .ticket-card {
+            background: #141414;
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid #222;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .ticket-card:active { transform: scale(0.98); }
+
+        .ticket-card::before, .ticket-card::after {
+            content: ''; position: absolute; top: 0; bottom: 0; width: 16px; 
+            background: #000; border-radius: 50%;
+        }
+        .ticket-card::before { left: -8px; top: 50%; transform: translateY(-50%); height: 16px; }
+        .ticket-card::after { right: -8px; top: 50%; transform: translateY(-50%); height: 16px; }
+        
+        .ticket-split { position: absolute; top: 15px; bottom: 15px; right: 60px; border-left: 2px dashed #333; }
+
+        .tk-main { flex: 1; padding: 20px; display: flex; flex-direction: column; justify-content: center; }
+        .tk-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .tk-type-icon { width: 32px; height: 32px; background: rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+        .tk-type { font-size: 10px; font-weight: 800; letter-spacing: 1px; color: #888; text-transform: uppercase; }
+        .tk-title { font-size: 18px; font-weight: 800; color: white; margin-bottom: 4px; }
+        .tk-meta { font-size: 12px; color: #888; font-family: 'JetBrains Mono'; display: flex; align-items: center; gap: 6px; }
+        .tk-status { margin-top: 15px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; width: max-content; }
+        .st-active { background: rgba(0, 230, 118, 0.1); color: var(--success); border: 1px solid var(--success); }
+        .st-ready { background: rgba(0, 240, 255, 0.1); color: var(--neon-blue); border: 1px solid var(--neon-blue); }
+        .st-past { background: rgba(255,255,255,0.05); color: #666; border: 1px solid #444; }
+        .tk-stub { width: 60px; display: flex; align-items: center; justify-content: center; background: #1a1a1a; border-left: 1px solid #222; }
+        .tk-qr { font-size: 24px; color: #fff; opacity: 0.5; }
+
+        /* --- VIEW 3: ORDER ACCORDION --- */
+        .order-list { padding: 20px; display: none; }
+        .order-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px; margin-bottom: 12px; overflow: hidden; transition: 0.3s ease; }
+        .order-card.active { background: #111; border-color: rgba(255,255,255,0.2); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .order-header { padding: 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .oh-left { display: flex; flex-direction: column; gap: 4px; }
+        .oh-store { font-weight: 700; font-size: 14px; color: white; }
+        .oh-meta { font-size: 11px; color: #777; font-family: 'JetBrains Mono'; }
+        .oh-right { display: flex; align-items: center; gap: 10px; }
+        .oh-price { font-family: 'JetBrains Mono'; font-weight: 700; color: var(--text); }
+        .oh-status { font-size: 9px; font-weight: 800; padding: 4px 8px; border-radius: 6px; text-transform: uppercase; }
+        .st-paid { background: rgba(0, 240, 255, 0.1); color: var(--neon-blue); border: 1px solid rgba(0, 240, 255, 0.3); }
+        .st-pending { background: rgba(255, 215, 0, 0.1); color: var(--gold); border: 1px solid rgba(255, 215, 0, 0.3); }
+        .st-cancelled { background: rgba(255, 63, 63, 0.1); color: var(--primary); border: 1px solid rgba(255, 63, 63, 0.3); }
+        .chevron { transition: 0.3s; font-size: 18px; color: #555; }
+        .order-card.active .chevron { transform: rotate(180deg); color: white; }
+        .order-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; background: rgba(0,0,0,0.3); }
+        .order-card.active .order-details { max-height: 500px; transition: max-height 0.5s ease-in; border-top: 1px dashed var(--border); }
+        .bill-content { padding: 20px; }
+        .bill-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #aaa; }
+        .bill-row.highlight { color: white; font-weight: 600; font-size: 13px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+        .bill-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .b-btn { padding: 12px; border-radius: 10px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s; text-transform: uppercase; letter-spacing: 0.5px; border: none; }
+        .btn-view { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .btn-view:hover { background: rgba(255,255,255,0.15); color: var(--neon-blue); border-color: var(--neon-blue); }
+        .btn-dl { background: transparent; color: #888; border: 1px solid #444; }
+        .btn-dl:hover { border-color: #888; color: white; }
+
+        /* --- NAV DOCK --- */
+        .nav-dock {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 360px; height: 75px;
+            background: rgba(10, 10, 10, 0.75); backdrop-filter: blur(25px); border-radius: 30px; border: 1px solid var(--border);
+            display: flex; justify-content: space-around; align-items: center; padding: 0 10px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); z-index: 100;
+        }
+        .nav-btn { width: 55px; height: 55px; border-radius: 20px; display: flex; align-items: center; justify-content: center; color: #666; transition: 0.3s; text-decoration: none;}
+        .nav-btn.active { color: white; background: rgba(255,255,255,0.1); }
+        .nav-btn span { font-size: 28px; }
+
+        /* --- MODALS --- */
+        .full-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.95); z-index: 200; display: none;
+            flex-direction: column; animation: fadeIn 0.3s;
+            align-items: center; justify-content: center;
+        }
+        .edit-modal-card { background: #111; border: 1px solid var(--border); padding: 20px; border-radius: 25px; width: 90%; max-width: 400px; max-height: 90%; display: flex; flex-direction: column; overflow: hidden; }
+        .modal-header { padding-bottom: 15px; margin-bottom: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-scroll { flex: 1; overflow-y: auto; padding-right: 5px; margin-bottom: 15px; scrollbar-width: none; }
+        .modal-input { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--border); padding: 12px; color: white; border-radius: 12px; margin-bottom: 15px; outline: none; font-family: inherit; }
+        .input-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px; display: block; margin-top: 10px; }
+        
+        .pref-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
+        .pref-pill { padding: 8px 15px; border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); font-size: 11px; font-weight: 600; color: #aaa; cursor: pointer; }
+        .pref-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .save-btn { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 15px; font-weight: bold; cursor: pointer; }
+
+        .drawer { position: fixed; bottom: 0; left: 0; width: 100%; height: 0; background: #111; border-top: 1px solid var(--border); z-index: 300; overflow: hidden; transition: 0.3s; padding: 0 25px; border-radius: 30px 30px 0 0; }
+        .drawer.open { height: 350px; padding-top: 25px; }
+        .drawer-item { display: flex; align-items: center; gap: 15px; padding: 15px 0; border-bottom: 1px solid var(--border); color: white; cursor: pointer; }
+        
+        .ticket-modal-card {
+            background: #141414;
+            border-radius: 20px;
+            width: 90%; max-width: 360px;
+            overflow: hidden;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+            border: 1px solid #333;
+        }
+        .ticket-modal-card::before, .ticket-modal-card::after {
+            content: ''; position: absolute; top: 70%; width: 30px; height: 30px; background: rgba(0,0,0,0.95); border-radius: 50%; z-index: 10;
+        }
+        .ticket-modal-card::before { left: -15px; }
+        .ticket-modal-card::after { right: -15px; }
+
+        .tm-header { background: linear-gradient(135deg, var(--primary), #a30000); padding: 25px; text-align: center; }
+        .tm-title { font-size: 22px; font-weight: 800; margin-bottom: 5px; color: white; }
+        .tm-sub { font-size: 12px; color: rgba(255,255,255,0.8); display: flex; justify-content: center; gap: 5px; }
+        
+        .tm-body { padding: 30px 20px; text-align: center; }
+        .tm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; text-align: left; }
+        .tm-label { font-size: 10px; color: #666; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+        .tm-val { font-size: 14px; font-weight: 700; color: white; font-family: 'JetBrains Mono'; }
+        
+        .tm-qr-box { background: white; padding: 10px; border-radius: 12px; display: inline-block; }
+        .tm-qr-img { width: 140px; height: 140px; display: block; }
+        
+        .tm-footer { border-top: 2px dashed #333; padding: 20px; text-align: center; background: #111; }
+        .tm-id { font-family: 'JetBrains Mono'; font-size: 18px; color: #888; font-weight: 700; letter-spacing: 2px; }
+        
+        .overlay-close { position: absolute; top: 20px; right: 20px; color: white; font-size: 24px; cursor: pointer; z-index: 20; background: rgba(0,0,0,0.5); border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <header>
+            <span class="material-icons-round settings-icon" style="opacity:0">settings</span>
+            <span class="material-icons-round settings-icon" onclick="openSettings()">settings</span>
+        </header>
+
+        <div class="profile-section">
+            <div class="avatar-container">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="avatar" id="main-avatar">
+                <div class="edit-badge" onclick="openEdit()"><span class="material-icons-round" style="font-size:16px;">edit</span></div>
+            </div>
+            <div class="user-name" id="display-name">Jane Doe</div>
+            <div class="user-bio" id="display-bio">Tasting the world, one bite at a time. 🌮</div>
+            <div class="mini-stats">
+                <div class="ms-item">Tasks: <span class="ms-val">2/5</span></div>
+                <div class="ms-item">Level: <span class="ms-val">5</span></div>
+                <div class="ms-item">Next: <span class="ms-val" style="color:var(--primary)">80%</span></div>
+            </div>
+        </div>
+
+        <div class="card-stage" onclick="window.location.href='coin-history.html'">
+            <div class="member-card" id="tilt-card">
+                <div class="card-glare" id="glare"></div>
+                <div class="card-top"><span class="card-logo">CRAVITY BLACK</span></div>
+                <div><div class="card-points">240</div><div class="level">AVAILABLE POINTS</div></div>
+                <div class="card-bottom"><span style="font-family:'JetBrains Mono'; font-size:10px; color:#666;">ID: 8829-1029</span><div class="level">LVL 5</div></div>
+            </div>
+        </div>
+
+        <div class="action-grid">
+            <a href="loyalty.html" class="action-card">
+                <span class="material-icons-round ac-icon" style="color:var(--neon-blue)">stars</span>
+                <span class="ac-label">Loyalty Vault</span>
+            </a>
+            <a href="tasks.html" class="action-card">
+                <span class="material-icons-round ac-icon" style="color:var(--gold)">assignment</span>
+                <span class="ac-label">Daily Missions</span>
+            </a>
+        </div>
+
+        <div class="section-header"><span>ACTIVE MISSIONS</span><span onclick="window.location.href='tasks.html'" style="cursor:pointer; color:var(--primary)">VIEW ALL</span></div>
+        <div class="task-preview">
+            <div class="task-item" onclick="window.location.href='tasks.html'">
+                <div class="task-info"><h4>Try a New Spot</h4><p>Order from a new place</p></div>
+                <div class="task-reward">+50</div>
+            </div>
+            <div class="task-item" onclick="window.location.href='tasks.html'">
+                <div class="task-info"><h4>Healthy Choice</h4><p>Order a salad or bowl</p></div>
+                <div class="task-reward">+30</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('feed', this)"><span class="material-icons-round">view_agenda</span></div>
+            <div class="tab" onclick="switchTab('tickets', this)"><span class="material-icons-round">confirmation_number</span></div>
+            <div class="tab" onclick="switchTab('orders', this)"><span class="material-icons-round">receipt_long</span></div>
+        </div>
+
+        <div class="content-area">
+            
+            <div class="feed-container" id="view-feed">
+                <div class="feed-post">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="fp-avatar">
+                    <div class="fp-body">
+                        <div class="fp-header">
+                            <div><span class="fp-user">Jane Doe</span><span class="fp-handle">@janedoe_eats</span><span class="fp-time"> • 2h</span></div>
+                            <span class="material-icons-round" style="font-size:16px; color:#666;">more_horiz</span>
+                        </div>
+                        <div class="fp-text">Just tried the new spicy ramen at Oishi Bowl. Absolutely fire! 🔥🍜 #Foodie #SpicyLover</div>
+                        <div class="fp-media"><img src="https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=600" class="fp-img"></div>
+                        <div class="fp-actions">
+                            <div class="fp-act like"><span class="material-icons-round">favorite_border</span> 24</div>
+                            <div class="fp-act comment"><span class="material-icons-round">chat_bubble_outline</span> 5</div>
+                            <div class="fp-act share"><span class="material-icons-round">share</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feed-post">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="fp-avatar">
+                    <div class="fp-body">
+                        <div class="fp-header">
+                            <div><span class="fp-user">Jane Doe</span><span class="fp-handle">@janedoe_eats</span><span class="fp-time"> • 5h</span></div>
+                            <span class="material-icons-round" style="font-size:16px; color:#666;">more_horiz</span>
+                        </div>
+                        <div class="fp-text">Can we talk about how good the coffee is at Urban Grind? My new go-to spot for work. ☕️💻</div>
+                        <div class="fp-actions">
+                            <div class="fp-act like"><span class="material-icons-round">favorite_border</span> 12</div>
+                            <div class="fp-act comment"><span class="material-icons-round">chat_bubble_outline</span> 2</div>
+                            <div class="fp-act share"><span class="material-icons-round">share</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feed-post">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="fp-avatar">
+                    <div class="fp-body">
+                        <div class="fp-header">
+                            <div><span class="fp-user">Jane Doe</span><span class="fp-handle">@janedoe_eats</span><span class="fp-time"> • 1d</span></div>
+                            <span class="material-icons-round" style="font-size:16px; color:#666;">more_horiz</span>
+                        </div>
+                        <div class="fp-text">Burger night done right! 🍔</div>
+                        <div class="fp-media"><img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600" class="fp-img"></div>
+                        <div class="fp-actions">
+                            <div class="fp-act like"><span class="material-icons-round">favorite_border</span> 45</div>
+                            <div class="fp-act comment"><span class="material-icons-round">chat_bubble_outline</span> 8</div>
+                            <div class="fp-act share"><span class="material-icons-round">share</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="feed-post">
+                    <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" class="fp-avatar">
+                    <div class="fp-body">
+                        <div class="fp-header">
+                            <div><span class="fp-user">Jane Doe</span><span class="fp-handle">@janedoe_eats</span><span class="fp-time"> • 2d</span></div>
+                            <span class="material-icons-round" style="font-size:16px; color:#666;">more_horiz</span>
+                        </div>
+                        <div class="fp-text">This Matcha Tiramisu changed my life. 🍵🍰 #DessertHeaven #Matcha</div>
+                        <div class="fp-media"><img src="https://images.unsplash.com/photo-1626803775151-61d756612f97?w=600" class="fp-img"></div>
+                        <div class="fp-actions">
+                            <div class="fp-act like"><span class="material-icons-round">favorite_border</span> 89</div>
+                            <div class="fp-act comment"><span class="material-icons-round">chat_bubble_outline</span> 14</div>
+                            <div class="fp-act share"><span class="material-icons-round">share</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="ticket-list" id="view-tickets">
+                
+                <div class="ticket-card" onclick="openTicket('Taco Haus', 'Table Booking', 'Today', '7:30 PM', '2 Guests', '#BK-299')">
+                    <div class="tk-main">
+                        <div class="tk-header">
+                            <div class="tk-type-icon"><span class="material-icons-round" style="color:var(--neon-blue);">chair</span></div>
+                            <div class="tk-type">Table Booking</div>
+                        </div>
+                        <div class="tk-title">Taco Haus</div>
+                        <div class="tk-meta"><span class="material-icons-round" style="font-size:14px;">event</span> Today • 7:30 PM • 2 Pax</div>
+                        <div class="tk-status st-active">Confirmed</div>
+                    </div>
+                    <div class="ticket-split"></div>
+                    <div class="tk-stub"><span class="material-icons-round tk-qr">qr_code_2</span></div>
+                </div>
+
+                <div class="ticket-card" onclick="openTicket('Urban Grind', 'Takeaway Order', 'Today', '2:15 PM', '3 Items', '#ORD-882')">
+                    <div class="tk-main">
+                        <div class="tk-header">
+                            <div class="tk-type-icon"><span class="material-icons-round" style="color:var(--gold);">shopping_bag</span></div>
+                            <div class="tk-type">Takeaway Order</div>
+                        </div>
+                        <div class="tk-title">Urban Grind</div>
+                        <div class="tk-meta"><span class="material-icons-round" style="font-size:14px;">receipt</span> #882 • 3 Items</div>
+                        <div class="tk-status st-ready">Ready for Pickup</div>
+                    </div>
+                    <div class="ticket-split"></div>
+                    <div class="tk-stub"><span class="material-icons-round tk-qr">qr_code_2</span></div>
+                </div>
+
+                <div class="ticket-card" onclick="openTicket('Sushi Zen', 'Table Booking', 'Dec 20', '8:00 PM', '4 Guests', '#BK-104')">
+                    <div class="tk-main">
+                        <div class="tk-header">
+                            <div class="tk-type-icon"><span class="material-icons-round" style="color:#888;">history</span></div>
+                            <div class="tk-type">Past Booking</div>
+                        </div>
+                        <div class="tk-title">Sushi Zen</div>
+                        <div class="tk-meta"><span class="material-icons-round" style="font-size:14px;">event_available</span> Dec 20 • 8:00 PM</div>
+                        <div class="tk-status st-past">Completed</div>
+                    </div>
+                    <div class="ticket-split"></div>
+                    <div class="tk-stub"><span class="material-icons-round tk-qr">qr_code_2</span></div>
+                </div>
+
+                <div class="ticket-card" onclick="openTicket('Burger King', 'Takeaway Order', 'Dec 15', '1:30 PM', '1 Item', '#ORD-771')">
+                    <div class="tk-main">
+                        <div class="tk-header">
+                            <div class="tk-type-icon"><span class="material-icons-round" style="color:#888;">shopping_bag</span></div>
+                            <div class="tk-type">Past Order</div>
+                        </div>
+                        <div class="tk-title">Burger King</div>
+                        <div class="tk-meta"><span class="material-icons-round" style="font-size:14px;">check_circle</span> Dec 15 • 1:30 PM</div>
+                        <div class="tk-status st-past">Picked Up</div>
+                    </div>
+                    <div class="ticket-split"></div>
+                    <div class="tk-stub"><span class="material-icons-round tk-qr">qr_code_2</span></div>
+                </div>
+
+            </div>
+
+            <div class="order-list" id="view-orders">
+                <div class="order-card">
+                    <div class="order-header" onclick="toggleOrder(this)">
+                        <div class="oh-left"><span class="oh-store">Taco Haus</span><span class="oh-meta">Today • 2:30 PM • #9920</span></div>
+                        <div class="oh-right"><span class="oh-status st-paid">Paid</span><span class="oh-price">$32.50</span><span class="material-icons-round chevron">expand_more</span></div>
+                    </div>
+                    <div class="order-details">
+                        <div class="bill-content">
+                            <div class="bill-row"><span>Spicy Chicken Taco x2</span><span>$12.00</span></div>
+                            <div class="bill-row"><span>Loaded Nachos</span><span>$14.00</span></div>
+                            <div class="bill-row"><span>Service Fee</span><span>$2.00</span></div>
+                            <div class="bill-row highlight"><span>Total Paid</span><span>$32.50</span></div>
+                            <div class="bill-actions">
+                                <button class="b-btn btn-view"><span class="material-icons-round" style="font-size:14px;">visibility</span> View Bill</button>
+                                <button class="b-btn btn-dl"><span class="material-icons-round" style="font-size:14px;">download</span> PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-card">
+                    <div class="order-header" onclick="toggleOrder(this)">
+                        <div class="oh-left"><span class="oh-store">Urban Grind</span><span class="oh-meta">Yesterday • 8:15 PM • #9918</span></div>
+                        <div class="oh-right"><span class="oh-status st-pending">Pending</span><span class="oh-price">$12.00</span><span class="material-icons-round chevron">expand_more</span></div>
+                    </div>
+                    <div class="order-details">
+                        <div class="bill-content">
+                            <div class="bill-row"><span>Iced Latte (Oat Milk)</span><span>$6.00</span></div>
+                            <div class="bill-row"><span>Avocado Toast</span><span>$5.50</span></div>
+                            <div class="bill-row highlight"><span>Total Due</span><span>$12.00</span></div>
+                            <div class="bill-actions">
+                                <button class="b-btn btn-view"><span class="material-icons-round" style="font-size:14px;">visibility</span> View Bill</button>
+                                <button class="b-btn btn-dl"><span class="material-icons-round" style="font-size:14px;">download</span> PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-card">
+                    <div class="order-header" onclick="toggleOrder(this)">
+                        <div class="oh-left"><span class="oh-store">Pizza Hut</span><span class="oh-meta">Dec 18 • 9:00 PM • #9901</span></div>
+                        <div class="oh-right"><span class="oh-status st-cancelled">Cancelled</span><span class="oh-price">$0.00</span><span class="material-icons-round chevron">expand_more</span></div>
+                    </div>
+                    <div class="order-details">
+                        <div class="bill-content">
+                            <div class="bill-row"><span>Pepperoni Pizza</span><span>$18.00</span></div>
+                            <div class="bill-row"><span>Refund Processed</span><span>-$18.00</span></div>
+                            <div class="bill-row highlight"><span>Total</span><span>$0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="order-card">
+                    <div class="order-header" onclick="toggleOrder(this)">
+                        <div class="oh-left"><span class="oh-store">Starbucks</span><span class="oh-meta">Dec 10 • 8:30 AM • #9850</span></div>
+                        <div class="oh-right"><span class="oh-status st-paid">Paid</span><span class="oh-price">$8.50</span><span class="material-icons-round chevron">expand_more</span></div>
+                    </div>
+                    <div class="order-details">
+                        <div class="bill-content">
+                            <div class="bill-row"><span>Caramel Macchiato</span><span>$5.50</span></div>
+                            <div class="bill-row"><span>Croissant</span><span>$3.00</span></div>
+                            <div class="bill-row highlight"><span>Total Paid</span><span>$8.50</span></div>
+                            <div class="bill-actions">
+                                <button class="b-btn btn-view"><span class="material-icons-round" style="font-size:14px;">visibility</span> View Bill</button>
+                                <button class="b-btn btn-dl"><span class="material-icons-round" style="font-size:14px;">download</span> PDF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="nav-dock">
+            <a href="home.html" class="nav-btn"><span class="material-icons-round">grid_view</span></a>
+            <a href="explore.html" class="nav-btn"><span class="material-icons-round">explore</span></a>  
+            <a href="reels.html" class="nav-btn"><span class="material-icons-round">smart_display</span></a>   
+            <a href="profile.html" class="nav-btn active"><span class="material-icons-round">person</span></a>
+        </div>
+    </div>
+
+    <div class="full-overlay" id="edit-modal">
+        <div class="edit-modal-card">
+            <div class="modal-header">
+                <h3 style="margin:0; color:white;">Edit Profile</h3>
+                <span class="material-icons-round" onclick="document.getElementById('edit-modal').style.display='none'" style="cursor:pointer; color:#888;">close</span>
+            </div>
+            <div class="modal-scroll">
+                
+                <div style="text-align:center; margin-bottom:20px;">
+                    <div style="position:relative; display:inline-block;">
+                        <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200" id="preview-avatar" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid #333;">
+                        <div style="position:absolute; bottom:0; right:0; background:var(--primary); width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px solid #000;">
+                            <span class="material-icons-round" style="font-size:14px; color:white;">camera_alt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <label class="input-label">Full Name</label>
+                <input type="text" class="modal-input" id="edit-name" value="Jane Doe">
+
+                <label class="input-label">Username</label>
+                <input type="text" class="modal-input" id="edit-username" value="@janedoe_eats">
+
+                <label class="input-label">Bio</label>
+                <textarea class="modal-input" id="edit-bio" rows="2">Tasting the world, one bite at a time. 🌮</textarea>
+
+                <label class="input-label">Contact Info</label>
+                <input type="tel" class="modal-input" id="edit-phone" placeholder="+1 234 567 8900" value="+91 98765 43210">
+                <input type="email" class="modal-input" id="edit-email" placeholder="jane@example.com" value="jane.doe@gmail.com">
+
+                <label class="input-label">Food Preferences (Tags)</label>
+                <div class="pref-grid">
+                    <div class="pref-pill active" onclick="this.classList.toggle('active')">Omnivore</div>
+                    <div class="pref-pill" onclick="this.classList.toggle('active')">Vegetarian</div>
+                    <div class="pref-pill" onclick="this.classList.toggle('active')">Vegan</div>
+                    <div class="pref-pill active" onclick="this.classList.toggle('active')">Spicy</div>
+                    <div class="pref-pill" onclick="this.classList.toggle('active')">Sweet Tooth</div>
+                </div>
+            </div>
+            <button class="save-btn" onclick="saveProfile()">SAVE CHANGES</button>
+        </div>
+    </div>
+
+    <div class="drawer" id="settings-drawer">
+        <div style="text-align:center; padding-bottom:10px; margin-bottom:10px; border-bottom:1px solid #333; font-weight:bold; color:#666;">SETTINGS</div>
+        <div class="drawer-item" onclick="window.location.href='subscription.html'" style="background:rgba(255, 215, 0, 0.1); border-radius:10px; padding:10px; border:1px solid var(--gold);"><span class="material-icons-round" style="color:var(--gold)">workspace_premium</span><span style="color:var(--gold); font-weight:bold;">Upgrade to Pro</span></div>
+        <div class="drawer-item"><span class="material-icons-round">account_circle</span> Account</div>
+        <div class="drawer-item" onclick="window.location.href='privacy.html'"><span class="material-icons-round">lock</span> Privacy</div>
+        <div class="drawer-item" onclick="window.location.href='contact.html'"><span class="material-icons-round">help</span> Help & Support</div>
+        <div class="drawer-item" style="color:var(--primary);" onclick="if(confirm('Logout?')) window.location.href='login.html'"><span class="material-icons-round">logout</span> Logout</div>
+        <button class="save-btn" onclick="document.getElementById('settings-drawer').classList.remove('open')" style="margin-top:10px; background:#222;">Close</button>
+    </div>
+
+    <div class="full-overlay" id="ticket-modal">
+        <span class="overlay-close" onclick="document.getElementById('ticket-modal').style.display='none'">&times;</span>
+        <div class="ticket-modal-card">
+            <div class="tm-header">
+                <div class="tm-title" id="tm-title">Taco Haus</div>
+                <div class="tm-sub"><span class="material-icons-round" style="font-size:14px;">confirmation_number</span> <span id="tm-type">Table Booking</span></div>
+            </div>
+            <div class="tm-body">
+                <div class="tm-grid">
+                    <div>
+                        <div class="tm-label">DATE</div>
+                        <div class="tm-val" id="tm-date">Today</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="tm-label">TIME</div>
+                        <div class="tm-val" id="tm-time">7:30 PM</div>
+                    </div>
+                    <div>
+                        <div class="tm-label">DETAILS</div>
+                        <div class="tm-val" id="tm-detail">2 Guests</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="tm-label">STATUS</div>
+                        <div class="tm-val" style="color:var(--success);">CONFIRMED</div>
+                    </div>
+                </div>
+                <div class="tm-qr-box">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=CravityTicket" class="tm-qr-img">
+                </div>
+                <div style="margin-top:10px; font-size:10px; color:#888;">SCAN AT COUNTER</div>
+            </div>
+            <div class="tm-footer">
+                <div style="font-size:10px; color:#666; margin-bottom:5px;">ORDER ID</div>
+                <div class="tm-id" id="tm-id">#BK-299</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(viewId, btn) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('view-feed').style.display = 'none';
+            document.getElementById('view-tickets').style.display = 'none';
+            document.getElementById('view-orders').style.display = 'none';
+            
+            if(viewId === 'feed') document.getElementById('view-feed').style.display = 'flex';
+            if(viewId === 'tickets') document.getElementById('view-tickets').style.display = 'block';
+            if(viewId === 'orders') document.getElementById('view-orders').style.display = 'block';
+        }
+
+        function toggleOrder(element) {
+            element.parentElement.classList.toggle('active');
+        }
+
+        function openEdit() { document.getElementById('edit-modal').style.display = 'flex'; }
+        function openSettings() { document.getElementById('settings-drawer').classList.toggle('open'); }
+        
+        // New Ticket Modal Logic
+        function openTicket(title, type, date, time, detail, id) {
+            document.getElementById('tm-title').innerText = title;
+            document.getElementById('tm-type').innerText = type;
+            document.getElementById('tm-date').innerText = date;
+            document.getElementById('tm-time').innerText = time;
+            document.getElementById('tm-detail').innerText = detail;
+            document.getElementById('tm-id').innerText = id;
+            document.getElementById('ticket-modal').style.display = 'flex';
+        }
+
+        // Updated Save Profile Logic
+        function saveProfile() {
+            // Update the main page UI with new values
+            const newName = document.getElementById('edit-name').value;
+            const newBio = document.getElementById('edit-bio').value;
+            
+            if(newName) document.getElementById('display-name').innerText = newName;
+            if(newBio) document.getElementById('display-bio').innerText = newBio;
+            
+            // Close Modal
+            document.getElementById('edit-modal').style.display = 'none';
+            
+            // Optional: Vibrate for feedback on mobile
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        // 3D Card
+        const card = document.getElementById('tilt-card'); const glare = document.getElementById('glare');
+        card.addEventListener('mousemove', (e) => {
+            const rect = card.getBoundingClientRect();
+            const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+            const xRot = ((y - rect.height/2)/rect.height)*20; const yRot = ((x - rect.width/2)/rect.width)*-20;
+            card.style.transform = `perspective(1000px) rotateX(${xRot}deg) rotateY(${yRot}deg)`;
+            glare.style.background = `radial-gradient(circle at ${x}px ${y}px, rgba(255,255,255,0.2) 0%, transparent 60%)`;
+        });
+        card.addEventListener('mouseleave', () => { card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg)`; glare.style.background = `transparent`; });
+    </script>
+
+</body>
+</html>

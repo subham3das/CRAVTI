@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Cravity - Privacy</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- 1. CORE THEME --- */
+        :root {
+            --bg: #000;
+            --glass: rgba(20, 20, 20, 0.6);
+            --border: rgba(255, 255, 255, 0.1);
+            --primary: #FF3F3F;
+            --neon-blue: #00F0FF;
+            --success: #00E676;
+            --text: #FFF;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background: #000; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--text);
+            display: flex; justify-content: center; height: 100vh; overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%; max-width: 414px; height: 100%; position: relative;
+            background: radial-gradient(circle at 50% 0%, #1a1a1a 0%, #000 80%);
+            overflow-y: scroll; scroll-behavior: smooth; scrollbar-width: none; 
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .app-container::-webkit-scrollbar { display: none; }
+
+        /* --- 2. HEADER --- */
+        header {
+            padding: 25px; display: flex; align-items: center; gap: 15px;
+            position: sticky; top: 0; z-index: 20; background: linear-gradient(to bottom, #000 80%, transparent);
+        }
+        .icon-glass {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;
+            border: 1px solid var(--border); color: white; cursor: pointer; transition: 0.2s;
+        }
+        .icon-glass:active { transform: scale(0.9); background: var(--primary); border-color: var(--primary); }
+        
+        .page-title { font-size: 18px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+
+        /* --- 3. CONTENT --- */
+        .content-area { padding: 0 25px 100px 25px; }
+        
+        .hero-text {
+            margin-bottom: 30px; text-align: center;
+        }
+        .hero-text h1 { font-size: 24px; font-weight: 800; margin-bottom: 5px; }
+        .hero-text p { font-size: 12px; color: #888; font-family: 'JetBrains Mono'; }
+
+        /* Policy Modules */
+        .policy-card {
+            background: var(--glass); border: 1px solid var(--border);
+            border-radius: 20px; padding: 20px; margin-bottom: 15px;
+            backdrop-filter: blur(10px); transition: 0.3s;
+        }
+        .policy-card:hover { border-color: var(--primary); box-shadow: 0 0 20px rgba(255, 63, 63, 0.1); }
+
+        .pc-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .pc-icon { color: var(--neon-blue); font-size: 20px; }
+        .pc-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .pc-text { font-size: 12px; color: #aaa; line-height: 1.6; }
+        .highlight { color: white; font-weight: 700; }
+
+        /* Last Updated Badge */
+        .update-badge {
+            text-align: center; margin: 20px 0;
+            font-size: 10px; color: #666; font-family: 'JetBrains Mono';
+            border: 1px dashed #333; padding: 10px; border-radius: 10px;
+        }
+
+        /* --- 4. ACCEPT BAR --- */
+        .action-dock {
+            position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+            width: 100%; max-width: 414px; padding: 20px 25px 40px 25px;
+            background: #000; border-top: 1px solid var(--border);
+            z-index: 30; display: flex; gap: 15px;
+        }
+        
+        .btn-ghost {
+            flex: 1; padding: 15px; background: rgba(255,255,255,0.1); color: #aaa;
+            border: 1px solid var(--border); border-radius: 15px; font-weight: 700; cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-primary {
+            flex: 2; padding: 15px; background: var(--primary); color: white;
+            border: none; border-radius: 15px; font-weight: 800; cursor: pointer;
+            font-size: 14px; box-shadow: 0 0 30px rgba(255, 63, 63, 0.3);
+        }
+        
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <header>
+            <div class="icon-glass" onclick="window.history.back()">
+                <span class="material-icons-round">arrow_back</span>
+            </div>
+            <div class="page-title">Privacy Protocol</div>
+            <div style="width:40px"></div>
+        </header>
+
+        <div class="content-area">
+            <div class="hero-text">
+                <h1>Data Transparency</h1>
+                <p>YOUR DATA. YOUR CONTROL.</p>
+            </div>
+
+            <div class="update-badge">LAST UPDATED: OCT 24, 2025 // V 3.0</div>
+
+            <div class="policy-card">
+                <div class="pc-header">
+                    <span class="material-icons-round pc-icon" style="color:var(--primary)">location_on</span>
+                    <div class="pc-title">Location Services</div>
+                </div>
+                <div class="pc-text">
+                    We collect your <span class="highlight">Real-time Geo-data</span> only when the app is active to find nearby restaurants and enable the "Eat With Me" beacon feature. This data is ephemeral and not stored permanently.
+                </div>
+            </div>
+
+            <div class="policy-card">
+                <div class="pc-header">
+                    <span class="material-icons-round pc-icon">credit_card</span>
+                    <div class="pc-title">Payment Security</div>
+                </div>
+                <div class="pc-text">
+                    All transactions are encrypted via <span class="highlight">AES-256 bit SSL</span>. Cravity does not store your raw credit card numbers; they are tokenized by our payment processor (Stripe/Razorpay).
+                </div>
+            </div>
+
+            <div class="policy-card">
+                <div class="pc-header">
+                    <span class="material-icons-round pc-icon" style="color:var(--success)">group</span>
+                    <div class="pc-title">Social Sharing</div>
+                </div>
+                <div class="pc-text">
+                    Your "Beacon" status is only visible to <span class="highlight">Accepted Friends</span>. You can toggle "Stealth Mode" in the Social Radar settings to become invisible instantly.
+                </div>
+            </div>
+
+            <div class="policy-card">
+                <div class="pc-header">
+                    <span class="material-icons-round pc-icon" style="color:var(--gold)">cookie</span>
+                    <div class="pc-title">Cookies & Cache</div>
+                </div>
+                <div class="pc-text">
+                    We use local storage to remember your "Dark Mode" preference and "Cart Items". No third-party tracking cookies are used for advertising.
+                </div>
+            </div>
+
+            <div style="height: 20px;"></div>
+        </div>
+
+        <div class="action-dock">
+            <button class="btn-ghost" onclick="alert('You can adjust permissions in Settings')">SETTINGS</button>
+            <button class="btn-primary" onclick="acceptPrivacy()">I AGREE</button>
+        </div>
+
+    </div>
+
+    <script>
+        function acceptPrivacy() {
+            if(navigator.vibrate) navigator.vibrate(50);
+            // Visual feedback
+            const btn = document.querySelector('.btn-primary');
+            btn.innerText = "ACCEPTED ✓";
+            btn.style.background = "#00E676";
+            btn.style.boxShadow = "0 0 30px #00E676";
+            
+            setTimeout(() => {
+                window.history.back();
+            }, 1000);
+        }
+    </script>
+
+</body>
+</html>
