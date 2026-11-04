@@ -1,8 +1,0 @@
-/* css/booking.css */
-.booking-header { padding: 20px; display: flex; align-items: center; background: var(--white); font-weight: bold; font-size: 18px; gap: 10px; }
-.form-container { padding: 25px; background: var(--white); margin: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
-
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; margin-bottom: 8px; font-weight: bold; font-size: 13px; color: var(--gray); text-transform: uppercase; }
-.form-control { width: 100%; padding: 15px; border: 2px solid var(--off-white); border-radius: 12px; font-size: 16px; background: var(--off-white); color: var(--dark); outline: none; }
-.form-control:focus { border-color: var(--primary); background: var(--white); }
