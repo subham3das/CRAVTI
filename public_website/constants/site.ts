@@ -1,3 +1,5 @@
+import env from '../config/env';
+
 export const SITE_CONFIG = {
   name: 'Craviti',
   legalName: 'Craviti Technologies Private Limited',
@@ -6,8 +8,8 @@ export const SITE_CONFIG = {
     'Empower your restaurant with frictionless QR code dining, instantaneous contactless ordering, real-time Kitchen Display Systems, unified settlements, and deep business analytics.',
   url: 'https://craviti.com',
   ogImage: 'https://craviti.com/og-craviti.png',
-  appUrl: process.env.NEXT_PUBLIC_APP_URL || 'https://cravti.vercel.app',
-  adminUrl: process.env.NEXT_PUBLIC_ADMIN_URL || 'https://cravti-admin.vercel.app',
+  appUrl: env.APP_URL,
+  adminUrl: env.ADMIN_URL,
   supportEmail: 'support@craviti.com',
   salesEmail: 'sales@craviti.com',
   legalEmail: 'legal@craviti.com',

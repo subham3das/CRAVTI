@@ -1,14 +1,10 @@
 import mongoose from 'mongoose';
+import env from './env.js';
 
 export const connectDB = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI;
+    const uri = env.MONGO_URI;
 
-    if (!mongoUri) {
-      console.warn('⚠️ MONGODB_URI not found in environment. Connecting to local fallback: mongodb://127.0.0.1:27017/craviti');
-    }
-
-    const uri = mongoUri || 'mongodb://127.0.0.1:27017/craviti';
     const conn = await mongoose.connect(uri, {
       dbName: 'craviti',
     });
@@ -20,4 +16,3 @@ export const connectDB = async () => {
     process.exit(1);
   }
 };
-

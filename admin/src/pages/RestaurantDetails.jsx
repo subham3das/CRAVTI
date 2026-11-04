@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import env from '../config/env.js';
 import {
   FiArrowLeft,
   FiCheckCircle,
@@ -321,7 +322,7 @@ export const RestaurantDetails = () => {
         }));
         toast.success('Support Mode activated. Launching read-only restaurant console...');
         setSupportModal(false);
-        const restaurantBaseUrl = import.meta.env.VITE_RESTAURANT_URL || window.location.origin;
+        const restaurantBaseUrl = env.RESTAURANT_URL || window.location.origin;
         window.open(`${restaurantBaseUrl}/admin-support-session?token=${res.data.supportToken}&restaurantId=${restaurantId}`, '_blank');
       }
     } catch (err) {

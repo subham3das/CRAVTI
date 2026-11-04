@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { fetchSettingsApi, updateSettingsApi } from '../services/settingsService';
 import { useAuth } from './AuthContext';
 import toast from 'react-hot-toast';
+import env from '../config/env.js';
 
 const SettingsContext = createContext(null);
 
@@ -35,10 +36,7 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     if (!restaurant?._id) return;
 
-    const backendUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
+    const backendUrl = env.SOCKET_URL;
 
     const socket = io(backendUrl, {
       transports: ['websocket', 'polling'],

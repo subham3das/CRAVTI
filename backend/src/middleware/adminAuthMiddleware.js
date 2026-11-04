@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { Admin } from '../models/Admin.js';
 import { ADMIN_STATUS, ADMIN_ROLES, DEFAULT_ROLE_PERMISSIONS } from '../constants/adminConstants.js';
+import env from '../config/env.js';
 
 export const adminProtect = async (req, res, next) => {
   let token;
@@ -19,7 +20,7 @@ export const adminProtect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'craviti_jwt_secret_dev_key');
+    const decoded = jwt.verify(token, env.JWT_SECRET);
 
     // Strict token isolation: Token MUST have type === 'admin'
     if (decoded.type !== 'admin') {

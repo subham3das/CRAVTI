@@ -23,6 +23,7 @@ import {
   markAllRestaurantNotificationsReadApi,
 } from '../services/notificationService';
 import { playOrderChime } from '../utils/soundNotification';
+import env from '../config/env.js';
 import toast from 'react-hot-toast';
 
 export const Navbar = ({ onOpenSidebar }) => {
@@ -78,10 +79,7 @@ export const Navbar = ({ onOpenSidebar }) => {
     const restaurantId = restaurant?._id;
     if (!restaurantId) return;
 
-    const backendUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
+    const backendUrl = env.SOCKET_URL;
 
     const socket = io(backendUrl, {
       transports: ['websocket', 'polling'],

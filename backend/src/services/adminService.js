@@ -1,6 +1,7 @@
 import os from 'os';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
+import env from '../config/env.js';
 import { Admin } from '../models/Admin.js';
 import { AdminAuditLog } from '../models/AdminAuditLog.js';
 import { AdminNotification } from '../models/AdminNotification.js';
@@ -142,7 +143,7 @@ export const seedDefaultAdmin = async () => {
     }
 
     // 2. Module 10: Seed default Super Admin ONLY in development!
-    if (process.env.NODE_ENV === 'production') {
+    if (env.IS_PRODUCTION) {
       console.log('🔒 Production mode: Default admin auto-seeding bypassed for security.');
       return;
     }
@@ -270,7 +271,7 @@ export const loginAdminService = async ({ email, password, ip = '', userAgent = 
 
   const token = jwt.sign(
     { id: admin._id, role: admin.role, type: 'admin' },
-    process.env.JWT_SECRET || 'craviti_jwt_secret_dev_key',
+    env.JWT_SECRET,
     { expiresIn: '7d' }
   );
 
@@ -1184,7 +1185,7 @@ export const getRestaurantSupportSessionService = async (restaurantId, superAdmi
       isSupportMode: true,
       superAdminEmail: superAdmin.email,
     },
-    process.env.JWT_SECRET || 'craviti_jwt_secret_dev_key',
+    env.JWT_SECRET,
     { expiresIn: '2h' }
   );
 
@@ -2351,8 +2352,8 @@ export const getSystemHealthService = async () => {
       status: 'Healthy',
       nodeVersion: process.version,
       uptimeSeconds,
-      environment: process.env.NODE_ENV || 'development',
-      port: process.env.PORT || 5001,
+      environment: env.NODE_ENV,
+      port: env.PORT,
     },
     database: {
       status: mongoStateMap[mongoose.connection.readyState] || 'Unknown',

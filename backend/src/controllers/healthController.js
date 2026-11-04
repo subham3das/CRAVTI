@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import env from '../config/env.js';
 
 const formatBytes = (bytes) => {
   if (!bytes || bytes === 0) return '0 B';
@@ -32,7 +33,7 @@ export const getRoot = (req, res) => {
     service: 'Craviti API',
     status: 'Healthy',
     version: '1.0.0',
-    environment: process.env.NODE_ENV || 'production',
+    environment: env.NODE_ENV,
     timestamp: new Date().toISOString(),
     documentation: '/api',
     health: '/health',
@@ -53,11 +54,11 @@ export const getHealth = (req, res) => {
     uptimeSeconds: Math.floor(uptimeSec),
     timestamp: new Date().toISOString(),
     currentServerTime: new Date().toLocaleString('en-IN', {
-      timeZone: process.env.TZ || 'Asia/Kolkata',
+      timeZone: env.TZ,
     }),
-    timezone: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    timezone: env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     database: isDbConnected ? 'Connected' : 'Disconnected',
-    environment: process.env.NODE_ENV || 'production',
+    environment: env.NODE_ENV,
     pid: process.pid,
     node: process.version,
     platform: process.platform,
@@ -77,7 +78,7 @@ export const getHealth = (req, res) => {
  */
 export const getReadiness = (req, res) => {
   const isDbConnected = mongoose.connection.readyState === 1;
-  const isEnvLoaded = Boolean(process.env.NODE_ENV || process.env.PORT);
+  const isEnvLoaded = Boolean(env.NODE_ENV && env.PORT);
 
   if (isDbConnected && isEnvLoaded) {
     return res.status(200).json({
@@ -105,3 +106,4 @@ export const getLiveness = (req, res) => {
     uptime: process.uptime(),
   });
 };
+

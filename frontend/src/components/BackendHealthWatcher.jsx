@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FiCloudOff, FiRefreshCw } from 'react-icons/fi';
+import env from '../config/env.js';
 
 export const BackendHealthWatcher = () => {
   const [isOffline, setIsOffline] = useState(false);
@@ -7,7 +8,7 @@ export const BackendHealthWatcher = () => {
 
   const checkHealth = useCallback(async () => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'https://cravti.onrender.com/api';
+      const apiUrl = env.API_BASE_URL;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 10000);
 

@@ -14,3 +14,4 @@ router.get('/ready', getReadiness);
 router.get('/live', getLiveness);
 
 export default router;
+

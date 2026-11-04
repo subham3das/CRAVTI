@@ -2,6 +2,7 @@
  * Razorpay Checkout SDK Loader & Runtime Handler
  * Dynamically injects script and manages modal callbacks.
  */
+import env from '../config/env.js';
 
 let scriptPromise = null;
 
@@ -43,7 +44,7 @@ export const openRazorpayModal = async ({
   }
 
   const options = {
-    key: orderData.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID || '',
+    key: orderData.keyId || env.RAZORPAY_KEY_ID || '',
     amount: orderData.amountInPaise,
     currency: orderData.currency || 'INR',
     name: orderData.restaurantName || 'Craviti Dining',

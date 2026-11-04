@@ -13,12 +13,13 @@ dotenv.config();
 import { validateEnv } from './config/validateEnv.js';
 validateEnv();
 
+import env from './config/env.js';
 import app from './app.js';
 import { connectDB } from './config/db.js';
 import { initSocket } from './config/socket.js';
 import { seedDefaultAdmin } from './services/adminService.js';
 
-const DEFAULT_PORT = parseInt(process.env.PORT, 10) || 5000;
+const DEFAULT_PORT = env.PORT;
 
 const startServer = async () => {
   try {
@@ -34,7 +35,7 @@ const startServer = async () => {
 
     const tryListen = (port) => {
       server.listen(port, () => {
-        const envName = process.env.NODE_ENV || 'development';
+        const envName = env.NODE_ENV;
         console.log(`
 ==========================================
         CRAVITI API SERVER

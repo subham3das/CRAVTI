@@ -1,8 +1,9 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import env from '../config/env.js';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://cravti.onrender.com/api/admin',
+  baseURL: env.API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

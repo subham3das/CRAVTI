@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { playOrderChime } from '../utils/soundNotification';
 import { formatCurrency, formatTime, formatDateTime } from '../utils/formatters';
+import env from '../config/env.js';
 import {
   FiGrid,
   FiList,
@@ -120,10 +121,7 @@ export const Orders = () => {
   useEffect(() => {
     if (!restaurant?._id) return;
 
-    const socketUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
+    const socketUrl = env.SOCKET_URL;
 
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],

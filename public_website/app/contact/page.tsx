@@ -6,6 +6,7 @@ import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { SITE_CONFIG } from '../../constants/site';
+import env from '../../config/env';
 import {
   Phone,
   Mail,
@@ -33,7 +34,7 @@ export default function ContactPage() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://cravti.onrender.com/api';
+      const apiUrl = env.API_URL;
       await fetch(`${apiUrl}/health`, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getRazorpayInstance, isRazorpayConfigured } from '../config/razorpay.js';
+import env from '../config/env.js';
 import { Payment } from '../models/Payment.js';
 import { Order } from '../models/Order.js';
 import { Restaurant } from '../models/Restaurant.js';
@@ -95,7 +96,7 @@ export const createPaymentOrderService = async ({
       notes: rzpOrder.notes,
       metadata: {
         razorpayOrder: rzpOrder,
-        mode: process.env.RAZORPAY_MODE || 'test',
+        mode: env.RAZORPAY_MODE || 'test',
       },
       auditHistory: [
         {
@@ -112,7 +113,7 @@ export const createPaymentOrderService = async ({
     payment.amount = order.grandTotal;
     payment.metadata = {
       razorpayOrder: rzpOrder,
-      mode: process.env.RAZORPAY_MODE || 'test',
+      mode: env.RAZORPAY_MODE || 'test',
     };
     payment.auditHistory.push({
       action: 'RECREATE_ORDER',
@@ -142,7 +143,7 @@ export const createPaymentOrderService = async ({
     amount: order.grandTotal,
     amountInPaise,
     currency: 'INR',
-    keyId: process.env.RAZORPAY_KEY_ID?.trim() || '',
+    keyId: env.RAZORPAY_KEY_ID?.trim() || '',
     orderId: order._id,
     orderNumber: order.orderNumber,
     restaurantName: restaurant.restaurantName,
@@ -172,7 +173,7 @@ export const verifyPaymentService = async ({
     throw error;
   }
 
-  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+  const keySecret = env.RAZORPAY_KEY_SECRET?.trim();
   if (!keySecret) {
     const error = new Error('Razorpay secret key is not configured on the server.');
     error.statusCode = 500;
@@ -448,7 +449,7 @@ export const refundPaymentService = async ({
  * 4. Verify and Handle Razorpay Webhooks
  */
 export const handleRazorpayWebhookService = async ({ rawBody, signature }) => {
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+  const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
     const error = new Error('Razorpay webhook secret not configured.');
     error.statusCode = 500;

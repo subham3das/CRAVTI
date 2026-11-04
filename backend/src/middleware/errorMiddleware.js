@@ -1,4 +1,5 @@
 import { HTTP_STATUS } from '../constants/index.js';
+import env from '../config/env.js';
 
 export const notFound = (req, res, next) => {
   const error = new Error(`Resource not found: ${req.originalUrl}`);
@@ -54,6 +55,6 @@ export const errorHandler = (err, req, res, next) => {
     success: false,
     message,
     error: err.name || 'Error',
-    details: process.env.NODE_ENV === 'production' ? null : err.stack,
+    details: env.IS_PRODUCTION ? null : err.stack,
   });
 };

@@ -13,6 +13,7 @@ import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { mongoSanitize } from './middleware/mongoSanitize.js';
+import env from './config/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,22 +28,26 @@ app.use(
 );
 
 const allowedOrigins = [
-  process.env.CLIENT_URL || 'http://localhost:5173',
-  process.env.ADMIN_CLIENT_URL || 'http://localhost:5174',
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'http://localhost:5175',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:5174',
-  'http://127.0.0.1:5175',
-];
+  env.CLIENT_URL,
+  env.ADMIN_CLIENT_URL,
+  ...(!env.IS_PRODUCTION
+    ? [
+        'http://localhost:5173',
+        'http://localhost:5174',
+        'http://localhost:5175',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
+        'http://127.0.0.1:5175',
+      ]
+    : []),
+].filter(Boolean);
 
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
     if (
       allowedOrigins.includes(origin) ||
-      /^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)
+      (!env.IS_PRODUCTION && /^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin))
     ) {
       return callback(null, true);
     }
@@ -65,7 +70,7 @@ app.use(mongoSanitize);
 
 // Compression & Body Parsers with size limits
 app.use(compression());
-app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(morgan(env.IS_PRODUCTION ? 'combined' : 'dev'));
 app.use(
   express.json({
     limit: '10mb',

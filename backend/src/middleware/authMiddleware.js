@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { RestaurantUser } from '../models/RestaurantUser.js';
+import env from '../config/env.js';
 
 export const protect = async (req, res, next) => {
   let token;
@@ -18,7 +19,7 @@ export const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'craviti_jwt_secret_dev_key');
+    const decoded = jwt.verify(token, env.JWT_SECRET);
     const user = await RestaurantUser.findById(decoded.id).select('-password');
 
     if (!user) {

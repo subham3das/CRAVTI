@@ -10,6 +10,7 @@ import {
   fetchAdminPaymentsService,
 } from '../services/paymentService.js';
 import { isRazorpayConfigured, getRazorpayInstance } from '../config/razorpay.js';
+import env from '../config/env.js';
 
 /**
  * POST /api/payment/create-order
@@ -74,15 +75,15 @@ export const handlePaymentWebhook = asyncHandler(async (req, res) => {
  */
 export const getGatewayStatus = asyncHandler(async (req, res) => {
   const configured = isRazorpayConfigured();
-  const keyId = process.env.RAZORPAY_KEY_ID?.trim() || '';
+  const keyId = env.RAZORPAY_KEY_ID?.trim() || '';
   const maskedKey = keyId.length > 8 ? `${keyId.slice(0, 8)}••••••••` : 'Not Configured';
 
   return sendSuccess(res, 'Payment gateway configuration loaded', {
     gateway: 'Razorpay',
     status: configured ? 'Connected' : 'Not Configured',
-    environment: (process.env.RAZORPAY_MODE || 'test').toUpperCase(),
+    environment: (env.RAZORPAY_MODE || 'test').toUpperCase(),
     merchantKeyMasked: maskedKey,
-    webhook: Boolean(process.env.RAZORPAY_WEBHOOK_SECRET?.trim()) ? 'Connected' : 'Pending Setup',
+    webhook: Boolean(env.RAZORPAY_WEBHOOK_SECRET?.trim()) ? 'Connected' : 'Pending Setup',
     isConfigured: configured,
   });
 });
@@ -108,7 +109,7 @@ export const testGatewayConnection = asyncHandler(async (req, res) => {
     return sendSuccess(res, 'Razorpay Connection Test Passed (200 OK)', {
       gateway: 'Razorpay',
       status: 'PASS',
-      environment: process.env.RAZORPAY_MODE || 'test',
+      environment: env.RAZORPAY_MODE || 'test',
       timestamp: new Date().toISOString(),
     });
   } catch (err) {

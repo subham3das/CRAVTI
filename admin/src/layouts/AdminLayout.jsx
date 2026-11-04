@@ -21,6 +21,7 @@ import {
 import { MdQrCodeScanner } from 'react-icons/md';
 import { SIDEBAR_NAV_ITEMS, ROLE_COLORS } from '../constants';
 import { useAdminAuth } from '../contexts/AdminAuthContext';
+import env from '../config/env.js';
 import {
   globalSearchApi,
   fetchAdminNotificationsApi,
@@ -100,12 +101,7 @@ export const AdminLayout = () => {
   useEffect(() => {
     loadNotifications();
 
-    const backendUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.VITE_API_URL
-        ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '')
-        : 'https://cravti.onrender.com');
+    const backendUrl = env.SOCKET_URL;
 
     const socket = io(backendUrl, {
       transports: ['websocket', 'polling'],

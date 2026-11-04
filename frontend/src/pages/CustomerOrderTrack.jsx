@@ -19,6 +19,7 @@ import { generateReceiptPdf, RECEIPT_TEMPLATES } from '../utils/receiptGenerator
 import { CustomerVegBadge } from '../components/customer/CustomerVegBadge';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
+import env from '../config/env.js';
 
 // Simplified 4-stage Live Timeline
 const STAGES = [
@@ -135,10 +136,7 @@ export const CustomerOrderTrack = () => {
   useEffect(() => {
     if (!orderId) return;
 
-    const socketUrl =
-      import.meta.env.VITE_SOCKET_URL ||
-      import.meta.env.VITE_BACKEND_URL ||
-      (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
+    const socketUrl = env.SOCKET_URL;
 
     const socket = io(socketUrl, {
       transports: ['websocket', 'polling'],

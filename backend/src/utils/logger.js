@@ -1,3 +1,5 @@
+import env from '../config/env.js';
+
 /**
  * Centralized Application Logger for Craviti
  */
@@ -9,7 +11,7 @@ export const logger = {
   warn: (msg, ...args) => console.warn(`[${formatTimestamp()}] [WARN] ${msg}`, ...args),
   error: (msg, ...args) => console.error(`[${formatTimestamp()}] [ERROR] ${msg}`, ...args),
   debug: (msg, ...args) => {
-    if (process.env.NODE_ENV !== 'production') {
+    if (!env.IS_PRODUCTION) {
       console.debug(`[${formatTimestamp()}] [DEBUG] ${msg}`, ...args);
     }
   },

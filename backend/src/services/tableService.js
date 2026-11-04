@@ -2,8 +2,9 @@ import QRCode from 'qrcode';
 import { ZipArchive } from 'archiver';
 import { Table } from '../models/Table.js';
 import { Restaurant } from '../models/Restaurant.js';
+import env from '../config/env.js';
 
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
+const CLIENT_URL = env.CLIENT_URL;
 
 async function getSlug(restaurantId) {
   const r = await Restaurant.findById(restaurantId).select('slug restaurantName');

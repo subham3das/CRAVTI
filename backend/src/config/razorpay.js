@@ -1,4 +1,5 @@
 import Razorpay from 'razorpay';
+import env from './env.js';
 
 /**
  * Singleton Razorpay Gateway Instance
@@ -8,8 +9,8 @@ let razorpayInstance = null;
 
 export const isRazorpayConfigured = () => {
   return Boolean(
-    process.env.RAZORPAY_KEY_ID?.trim() &&
-    process.env.RAZORPAY_KEY_SECRET?.trim()
+    env.RAZORPAY_KEY_ID?.trim() &&
+    env.RAZORPAY_KEY_SECRET?.trim()
   );
 };
 
@@ -18,12 +19,12 @@ export const getRazorpayInstance = () => {
     return razorpayInstance;
   }
 
-  const key_id = process.env.RAZORPAY_KEY_ID?.trim();
-  const key_secret = process.env.RAZORPAY_KEY_SECRET?.trim();
+  const key_id = env.RAZORPAY_KEY_ID?.trim();
+  const key_secret = env.RAZORPAY_KEY_SECRET?.trim();
 
   if (!key_id || !key_secret) {
     throw new Error(
-      'Razorpay credentials missing. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in backend/.env'
+      'Razorpay credentials missing. Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your environment or .env'
     );
   }
 
@@ -45,4 +46,3 @@ export const razorpay = new Proxy({}, {
 });
 
 export default razorpay;
-

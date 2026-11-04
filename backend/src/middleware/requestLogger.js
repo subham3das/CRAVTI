@@ -1,3 +1,5 @@
+import env from '../config/env.js';
+
 /**
  * Centralized Production Request Logger Middleware
  * Captures request life-cycle metrics including latency, tenant, and guest identity.
@@ -33,12 +35,12 @@ export const requestLogger = (req, res, next) => {
       req.originalUrl === '/api/live' ||
       req.originalUrl === '/api/ready';
 
-    if (isHealthCheck && res.statusCode < 400 && process.env.NODE_ENV === 'production') {
+    if (isHealthCheck && res.statusCode < 400 && env.IS_PRODUCTION) {
       return;
     }
 
     // Compact single-line log in dev, structured JSON in prod
-    if (process.env.NODE_ENV === 'production') {
+    if (env.IS_PRODUCTION) {
       console.log(JSON.stringify(logEntry));
     } else {
       const color =
