@@ -1,0 +1,21 @@
+{
+  "name": "craviti-restaurant-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Craviti SaaS - QR-based Restaurant Ordering Platform (Restaurant Panel)",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "start:backend": "npm --prefix backend start"
+  },
+  "keywords": [
+    "saas",
+    "restaurant",
+    "qr-ordering",
+    "mern"
+  ],
+  "author": "Craviti Team",
+  "license": "MIT"
+}
+

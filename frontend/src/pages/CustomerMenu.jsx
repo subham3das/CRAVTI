@@ -1,0 +1,806 @@
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FiSearch,
+  FiX,
+  FiShoppingBag,
+  FiAlertCircle,
+  FiWifiOff,
+  FiClock,
+  FiStar,
+  FiArrowRight,
+  FiMapPin,
+  FiPlus,
+  FiCheck,
+} from 'react-icons/fi';
+import { MdQrCodeScanner, MdRestaurantMenu } from 'react-icons/md';
+import { fetchCustomerMenuApi, placeCustomerOrderApi } from '../services/orderService';
+import { createPaymentOrderApi, verifyPaymentApi } from '../services/paymentService';
+import { openRazorpayModal } from '../utils/razorpay';
+import { CustomerCartProvider, useCustomerCart } from '../context/CustomerCartContext';
+import { CustomerMenuCard } from '../components/customer/CustomerMenuCard';
+import { CustomerItemModal } from '../components/customer/CustomerItemModal';
+import { CustomerCartDrawer } from '../components/customer/CustomerCartDrawer';
+import { CustomerOrderSuccessModal } from '../components/customer/CustomerOrderSuccessModal';
+import { ImageWithFallback } from '../components/ImageWithFallback';
+import { getOrCreateGuestId, getOrCreateDeviceId, getOrCreateSessionId, setGuestId } from '../utils/guestSession';
+import { formatCurrency } from '../utils/formatters';
+import toast from 'react-hot-toast';
+
+const CustomerMenuContent = () => {
+  const { restaurantSlug, tableId } = useParams();
+  const navigate = useNavigate();
+
+  const {
+    cart,
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    getItemQuantity,
+    totalCount,
+    subtotal,
+    discount,
+    grandTotal,
+  } = useCustomerCart();
+
+  const [restaurant, setRestaurant] = useState(null);
+  const [table, setTable] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [menuItems, setMenuItems] = useState([]);
+  const [activeOrder, setActiveOrder] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [isOrderLocked, setIsOrderLocked] = useState(false);
+  const [waitingForPayment, setWaitingForPayment] = useState(false);
+  const [dismissActivePrompt, setDismissActivePrompt] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeCategory, setActiveCategory] = useState('ALL');
+
+  // Modals & Drawers
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [placedOrder, setPlacedOrder] = useState(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+  // Category refs for smooth scrolling
+  const categorySectionRefs = useRef({});
+
+  // 1. Offline Network Listener
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // 2. Fetch Restaurant, Table, Menu & Active Table Order
+  useEffect(() => {
+    let isMounted = true;
+    const loadMenu = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const guestId = getOrCreateGuestId();
+        const deviceId = getOrCreateDeviceId();
+        const res = await fetchCustomerMenuApi(restaurantSlug, tableId, guestId, deviceId);
+        if (isMounted && res.success && res.data) {
+          setRestaurant(res.data.restaurant);
+          setTable(res.data.table);
+          setCategories(res.data.categories || []);
+          setMenuItems(res.data.menuItems || []);
+          setSettings(res.data.settings || null);
+          setIsOrderLocked(Boolean(res.data.isOrderLocked));
+          setWaitingForPayment(Boolean(res.data.waitingForPayment));
+          if (res.data.activeOrder) {
+            setActiveOrder(res.data.activeOrder);
+          }
+        }
+      } catch (err) {
+        if (isMounted) {
+          const msg =
+            err.response?.data?.message ||
+            'Could not load restaurant menu. Please scan table QR again.';
+          setError(msg);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    if (restaurantSlug && tableId) {
+      loadMenu();
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [restaurantSlug, tableId]);
+
+  // 3. Filtered items based on search and category
+  const filteredItems = useMemo(() => {
+    let list = menuItems;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.itemName.toLowerCase().includes(q) ||
+          (i.description && i.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (activeCategory !== 'ALL') {
+      list = list.filter(
+        (i) =>
+          i.categoryId?._id === activeCategory ||
+          i.categoryId === activeCategory ||
+          i.categoryId?.categoryName === activeCategory
+      );
+    }
+
+    return list;
+  }, [menuItems, searchQuery, activeCategory]);
+
+  // Popular items
+  const popularItems = useMemo(() => {
+    return menuItems.filter((i) => i.popular || i.recommended).slice(0, 5);
+  }, [menuItems]);
+
+  // Items grouped by category
+  const groupedItems = useMemo(() => {
+    if (activeCategory !== 'ALL' || searchQuery.trim()) {
+      return null;
+    }
+
+    const groups = {};
+    for (const cat of categories) {
+      groups[cat._id] = {
+        categoryName: cat.categoryName,
+        items: [],
+      };
+    }
+
+    const otherKey = 'other';
+    groups[otherKey] = { categoryName: 'Specialties', items: [] };
+
+    for (const item of menuItems) {
+      const catId = item.categoryId?._id || item.categoryId || otherKey;
+      if (groups[catId]) {
+        groups[catId].items.push(item);
+      } else {
+        groups[otherKey].items.push(item);
+      }
+    }
+
+    return Object.entries(groups).filter(([_, group]) => group.items.length > 0);
+  }, [menuItems, categories, activeCategory, searchQuery]);
+
+  // Category scroll handler
+  const handleCategoryClick = (catId) => {
+    setActiveCategory(catId);
+    if (catId === 'ALL') {
+      window.scrollTo({ top: 180, behavior: 'smooth' });
+    } else {
+      const el = categorySectionRefs.current[catId];
+      if (el) {
+        const offset = 120;
+        const bodyRect = document.body.getBoundingClientRect().top;
+        const elementRect = el.getBoundingClientRect().top;
+        const elementPosition = elementRect - bodyRect;
+        const offsetPosition = elementPosition - offset;
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+      }
+    }
+  };
+
+  // Place Order handler (reuses active order if active)
+  const handlePlaceOrder = async ({ customerName, customerPhone, paymentMethod }) => {
+    try {
+      setIsPlacingOrder(true);
+      const guestId = getOrCreateGuestId();
+      const deviceId = getOrCreateDeviceId();
+      const sessionId = getOrCreateSessionId();
+
+      const orderPayload = {
+        restaurantSlug,
+        tableIdentifier: tableId,
+        guestId,
+        deviceId,
+        sessionId,
+        customerName: customerName || 'Guest',
+        customerPhone: customerPhone || '',
+        paymentMethod: paymentMethod || 'cash',
+        items: cart.map((i) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          specialInstructions: i.specialInstructions,
+        })),
+      };
+
+      const res = await placeCustomerOrderApi(orderPayload);
+      if (res.success && res.order) {
+        if (res.guestId) setGuestId(res.guestId);
+        clearCart();
+        setIsCartOpen(false);
+        setActiveOrder(res.order);
+        setPlacedOrder(res.order);
+
+        // Phase 5: Razorpay Checkout flow if customer selected Online Payment
+        if (paymentMethod === 'online') {
+          try {
+            const payRes = await createPaymentOrderApi({
+              orderId: res.order._id,
+              customerEmail: '',
+              customerPhone: customerPhone || '',
+              guestSessionId: sessionId,
+            });
+
+            if (payRes.success && payRes.data) {
+              await openRazorpayModal({
+                orderData: payRes.data,
+                onSuccess: async (verifyPayload) => {
+                  try {
+                    const vRes = await verifyPaymentApi({
+                      orderId: res.order._id,
+                      ...verifyPayload,
+                    });
+                    if (vRes.success) {
+                      toast.success('Payment verified successfully! Receipt ready.');
+                      navigate(`/order/track/${res.order._id}`);
+                    }
+                  } catch (vErr) {
+                    toast.error(vErr.response?.data?.message || 'Payment verification failed.');
+                    navigate(`/order/track/${res.order._id}`);
+                  }
+                },
+                onDismiss: () => {
+                  toast('Online payment window closed. You can pay anytime from your order tracking screen.', { icon: 'ℹ️' });
+                  navigate(`/order/track/${res.order._id}`);
+                },
+                onError: (err) => {
+                  toast.error(err.message || 'Payment initiation error.');
+                  navigate(`/order/track/${res.order._id}`);
+                },
+              });
+              return;
+            }
+          } catch (payErr) {
+            console.warn('[Razorpay] Gateway note:', payErr.message);
+            toast('Order placed! Pay online from tracking page or pay cash on counter.', { icon: '💳' });
+            navigate(`/order/track/${res.order._id}`);
+            return;
+          }
+        }
+
+        if (res.appended) {
+          toast.success('Additional items appended to your active bill!');
+        }
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to place order. Please try again.';
+      toast.error(msg);
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
+
+  // Loading State
+  if (loading) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <motion.div
+          animate={{ scale: [1, 1.08, 1] }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+          className="w-20 h-20 rounded-2xl bg-[#16A34A] flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 mb-5"
+        >
+          <MdQrCodeScanner className="w-10 h-10" />
+        </motion.div>
+        <h3 className="font-extrabold text-slate-900 text-lg">Loading Menu...</h3>
+        <p className="text-xs text-slate-400 mt-1 max-w-xs">
+          Connecting to dining table telemetry and live menu
+        </p>
+      </div>
+    );
+  }
+
+  // Closed State
+  if (settings?.restaurantStatus === 'closed') {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
+          <FiAlertCircle className="w-8 h-8" />
+        </div>
+        <h3 className="font-extrabold text-slate-900 text-lg">Restaurant Closed</h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+          {restaurant?.restaurantName || 'This restaurant'} is currently closed and not accepting dining orders. Please visit during operating hours.
+        </p>
+      </div>
+    );
+  }
+
+  // Paused State
+  if (settings?.restaurantStatus === 'pause_orders' || settings?.acceptOrders === false) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center mb-3">
+          <FiClock className="w-8 h-8" />
+        </div>
+        <h3 className="font-extrabold text-slate-900 text-lg">Orders Temporarily Paused</h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+          The restaurant has temporarily paused taking new orders. Active dining table orders are continuing. Please check back shortly!
+        </p>
+        {activeOrder && (
+          <button
+            onClick={() => navigate(`/order/track/${activeOrder._id}`)}
+            className="mt-5 px-5 py-2.5 rounded-xl bg-[#16A34A] text-white font-bold text-xs shadow-md"
+          >
+            View Your Active Order
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Order Locked State (After Served)
+  if (isOrderLocked && activeOrder) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3">
+          <FiCheck className="w-8 h-8" />
+        </div>
+        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-full">
+          Order Locked
+        </span>
+        <h3 className="font-extrabold text-slate-900 text-lg mt-2">
+          Your previous order has already been served.
+        </h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+          Order <strong>#{activeOrder.orderNumber}</strong> (Table {table?.tableNumber || tableId}) is served and locked. No new items can be added to this bill.
+        </p>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 my-5 w-full max-w-xs text-left text-xs space-y-2 shadow-2xs">
+          <div className="flex justify-between">
+            <span className="text-slate-400">Total Bill:</span>
+            <span className="font-extrabold text-slate-900">{formatCurrency(activeOrder.grandTotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-400">Payment Status:</span>
+            <span className={`font-bold capitalize ${waitingForPayment ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {waitingForPayment ? 'Waiting for payment' : 'Paid'}
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-2.5 w-full max-w-xs">
+          <button
+            onClick={() => navigate(`/order/track/${activeOrder._id}`)}
+            className="w-full py-3.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2"
+          >
+            <span>{waitingForPayment ? 'View Bill / Settle Payment' : 'View Completed Order'}</span>
+            <FiArrowRight className="w-4 h-4" />
+          </button>
+
+          {!waitingForPayment && (
+            <button
+              onClick={() => {
+                setIsOrderLocked(false);
+                setActiveOrder(null);
+                window.location.reload();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs"
+            >
+              Start New Order
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Error State
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
+          <FiAlertCircle className="w-8 h-8" />
+        </div>
+        <h3 className="font-bold text-slate-900 text-base">Unable to Open Menu</h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-6 px-6 py-2.5 rounded-xl bg-[#16A34A] text-white font-bold text-xs shadow-md"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col pb-28 relative shadow-2xl">
+      {/* Offline Banner */}
+      {isOffline && (
+        <div className="bg-rose-500 text-white text-xs px-4 py-2 flex items-center justify-center gap-2 sticky top-0 z-50">
+          <FiWifiOff className="w-4 h-4" />
+          <span>You are offline. Please check your internet connection.</span>
+        </div>
+      )}
+
+      {/* Top App Header */}
+      <header className="bg-white px-4 pt-4 pb-3 border-b border-slate-100 sticky top-0 z-40 shadow-2xs">
+        <div className="flex items-center justify-between gap-3">
+          {/* Logo & Restaurant Info */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <ImageWithFallback
+              src={restaurant?.logo?.url}
+              alt={restaurant?.restaurantName}
+              type="logo"
+              className="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-2xs shrink-0"
+              fallbackContent={
+                <div className="w-10 h-10 rounded-xl bg-[#16A34A] text-white flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
+                  {restaurant?.restaurantName?.charAt(0) || 'C'}
+                </div>
+              }
+            />
+
+            <div className="min-w-0">
+              <h1 className="font-extrabold text-slate-900 text-base leading-tight truncate">
+                {restaurant?.restaurantName ?? 'Craviti Restaurant'}
+              </h1>
+              {restaurant?.address?.city && (
+                <p className="text-[11px] text-slate-400 flex items-center gap-1 truncate">
+                  <FiMapPin className="w-2.5 h-2.5 shrink-0" />
+                  <span>{restaurant.address.city}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Table Chip */}
+          <div className="shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
+            <span className="font-extrabold text-xs">
+              Table {table?.tableNumber || tableId}
+            </span>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="mt-3 relative">
+          <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search delicious dishes, drinks, desserts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full text-xs pl-10 pr-9 py-2.5 rounded-xl bg-slate-100/80 border border-slate-200/60 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/30 focus:bg-white transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </header>
+
+      {/* Busy Hour Status Alert */}
+      {settings?.restaurantStatus === 'busy' && (
+        <div className="bg-amber-500 text-white text-xs px-4 py-2 flex items-center justify-center gap-2 sticky top-[108px] z-36 font-bold shadow-xs">
+          <FiClock className="w-4 h-4 shrink-0" />
+          <span>High dining traffic today. Estimated preparation time ~{settings?.estimatedPreparationTime || 20} mins.</span>
+        </div>
+      )}
+
+      {/* Sticky Active Order Mini-Banner (when ordering more) */}
+      {activeOrder && dismissActivePrompt && (
+        <div className="bg-emerald-50 border-b border-emerald-200 px-4 py-2 flex items-center justify-between text-xs text-emerald-950 sticky top-[108px] z-35">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
+            <span className="font-bold">Active Bill: #{activeOrder.orderNumber}</span>
+            <span className="text-emerald-700 text-[11px] hidden sm:inline">• Items will be added to this bill</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/order/track/${activeOrder._id}`)}
+            className="text-[11px] font-extrabold text-[#16A34A] hover:underline"
+          >
+            View Live Order →
+          </button>
+        </div>
+      )}
+
+      {/* Sticky Category Chips Horizontal Scroll */}
+      <div className={`bg-white/95 backdrop-blur-md px-3 py-2 border-b border-slate-100 sticky ${activeOrder && dismissActivePrompt ? 'top-[144px]' : 'top-[108px]'} z-30 overflow-x-auto scrollbar-none flex gap-2`}>
+        <button
+          type="button"
+          onClick={() => handleCategoryClick('ALL')}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+            activeCategory === 'ALL'
+              ? 'bg-[#16A34A] text-white shadow-sm shadow-emerald-500/20'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          All Items
+        </button>
+
+        {(Array.isArray(categories) ? categories : []).map((cat) => (
+          <button
+            key={cat._id}
+            type="button"
+            onClick={() => handleCategoryClick(cat._id)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+              activeCategory === cat._id
+                ? 'bg-[#16A34A] text-white shadow-sm shadow-emerald-500/20'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {cat.categoryName}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content Area */}
+      <main className="flex-1 p-4 space-y-6">
+        {/* Popular / Recommended Items */}
+        {activeCategory === 'ALL' && !searchQuery.trim() && popularItems.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-1.5">
+              <FiStar className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <h2 className="font-extrabold text-slate-900 text-sm">Chef's Recommendations</h2>
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+              {(Array.isArray(popularItems) ? popularItems : []).map((item) => (
+                <div key={item._id} className="w-[200px] shrink-0">
+                  <CustomerMenuCard
+                    item={item}
+                    quantity={getItemQuantity(item._id)}
+                    onAdd={() => addToCart(item, 1)}
+                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                    onOpenModal={() => setSelectedItem(item)}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Grouped Section or Filtered Flat List */}
+        {groupedItems ? (
+          groupedItems.map(([catId, group]) => (
+            <section
+              key={catId}
+              ref={(el) => (categorySectionRefs.current[catId] = el)}
+              className="space-y-3 pt-2"
+            >
+              <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+                <h3 className="font-extrabold text-slate-900 text-sm">{group.categoryName}</h3>
+                <span className="text-[11px] font-bold text-slate-400">
+                  {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {(Array.isArray(group?.items) ? group.items : []).map((item) => (
+                  <CustomerMenuCard
+                    key={item._id}
+                    item={item}
+                    quantity={getItemQuantity(item._id)}
+                    onAdd={() => addToCart(item, 1)}
+                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                    onOpenModal={() => setSelectedItem(item)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))
+        ) : (
+          <section className="space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+              <h3 className="font-extrabold text-slate-900 text-sm">
+                {searchQuery ? `Search Results ("${searchQuery}")` : 'Menu Items'}
+              </h3>
+              <span className="text-[11px] font-bold text-slate-400">
+                {filteredItems.length} items
+              </span>
+            </div>
+
+            {filteredItems.length === 0 ? (
+              <div className="py-16 text-center">
+                <p className="text-slate-400 text-xs">No matching dishes found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {(Array.isArray(filteredItems) ? filteredItems : []).map((item) => (
+                  <CustomerMenuCard
+                    key={item._id}
+                    item={item}
+                    quantity={getItemQuantity(item._id)}
+                    onAdd={() => addToCart(item, 1)}
+                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                    onOpenModal={() => setSelectedItem(item)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+
+      {/* Floating Cart Pill (Bottom Bar) */}
+      <AnimatePresence>
+        {totalCount > 0 && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 50, opacity: 0 }}
+            className="fixed bottom-4 left-4 right-4 max-w-md mx-auto z-40"
+          >
+            <button
+              type="button"
+              onClick={() => setIsCartOpen(true)}
+              className="w-full bg-[#16A34A] hover:bg-[#15803d] text-white p-3.5 rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center justify-between active:scale-[0.98] transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm">
+                  {totalCount}
+                </div>
+                <div className="text-left">
+                  <p className="text-[10px] uppercase font-semibold text-emerald-100">
+                    Table {table?.tableNumber || tableId}
+                  </p>
+                  <p className="text-sm font-extrabold leading-tight">
+                    {formatCurrency(grandTotal)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 font-bold text-xs uppercase tracking-wider">
+                <span>View Cart</span>
+                <FiArrowRight className="w-4 h-4" />
+              </div>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Item Details Bottom Sheet Modal */}
+      <CustomerItemModal
+        item={selectedItem}
+        isOpen={Boolean(selectedItem)}
+        onClose={() => setSelectedItem(null)}
+        onAddToCart={(item, qty, instructions) => addToCart(item, qty, instructions)}
+      />
+
+      {/* Cart Drawer Bottom Sheet */}
+      <CustomerCartDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        subtotal={subtotal}
+        discount={discount}
+        grandTotal={grandTotal}
+        onUpdateQuantity={updateQuantity}
+        onRemoveItem={removeFromCart}
+        onPlaceOrder={handlePlaceOrder}
+        tableNumber={table?.tableNumber || tableId}
+        restaurantName={restaurant?.restaurantName || 'Restaurant'}
+        isPlacingOrder={isPlacingOrder}
+        hasActiveOrder={Boolean(activeOrder)}
+      />
+
+      {/* Order Placed Success Modal */}
+      <CustomerOrderSuccessModal
+        isOpen={Boolean(placedOrder)}
+        order={placedOrder}
+        onTrackOrder={() => {
+          const ordId = placedOrder._id;
+          setPlacedOrder(null);
+          navigate(`/order/track/${ordId}`);
+        }}
+        onOrderMore={() => {
+          setPlacedOrder(null);
+        }}
+      />
+
+      {/* QR Active Order Session Prompt (Requirement 3: QR Behavior Improvement) */}
+      <AnimatePresence>
+        {activeOrder && !dismissActivePrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDismissActivePrompt(true)}
+              className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm cursor-pointer"
+            />
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center z-10 overflow-hidden"
+            >
+              {/* Close (X) Button */}
+              <button
+                type="button"
+                onClick={() => setDismissActivePrompt(true)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-20"
+                aria-label="Close"
+              >
+                <FiX className="w-5 h-5" />
+              </button>
+
+              <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-[#16A34A] flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-inner">
+                <MdRestaurantMenu className="w-8 h-8" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#16A34A] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                Active Dining Table
+              </span>
+              <h3 className="text-xl font-black text-slate-900 mt-2">
+                You already have an active order.
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Order <strong>#{activeOrder.orderNumber}</strong> is active on Table {table?.tableNumber || tableId}.
+              </p>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 my-4 text-xs space-y-1.5 text-left">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Current Status:</span>
+                  <span className="font-bold text-slate-800 capitalize">{activeOrder.status}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Current Total:</span>
+                  <span className="font-extrabold text-[#16A34A]">{formatCurrency(activeOrder.grandTotal)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2.5">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/order/track/${activeOrder._id}`)}
+                  className="w-full py-3.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                >
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                  <span>Watch Live Order</span>
+                  <FiArrowRight className="w-4 h-4 ml-0.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setDismissActivePrompt(true)}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <FiPlus className="w-3.5 h-3.5" />
+                  <span>Order More</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+export const CustomerMenu = () => {
+  const { restaurantSlug, tableId } = useParams();
+  const storageKey = `craviti_cart_${restaurantSlug}_${tableId}`;
+
+  return (
+    <CustomerCartProvider storageKey={storageKey}>
+      <CustomerMenuContent />
+    </CustomerCartProvider>
+  );
+};
