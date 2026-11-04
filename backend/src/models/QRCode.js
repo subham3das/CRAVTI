@@ -76,3 +76,4 @@ qrCodeSchema.index({ restaurantId: 1, isActive: 1, isDeleted: 1 });
 
 export const QRCodeModel = mongoose.model('QRCode', qrCodeSchema);
 export default QRCodeModel;
+

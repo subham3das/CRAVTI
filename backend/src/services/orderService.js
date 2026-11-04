@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { Restaurant } from '../models/Restaurant.js';
 import { Table } from '../models/Table.js';
+import { QRCodeModel } from '../models/QRCode.js';
 import { Category } from '../models/Category.js';
 import { MenuItem } from '../models/MenuItem.js';
 import { Order } from '../models/Order.js';
@@ -128,14 +129,23 @@ export const generateReceiptSnapshot = async (orderId) => {
 /**
  * Public Customer Menu + Active Session & Lock Status Detection
  */
-export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, guestId = '', deviceId = '') => {
-  const restaurant = await Restaurant.findOne({ slug: restaurantSlug.toLowerCase() })
-    .select('restaurantName slug logo coverImage description address timing paymentEnabled verificationStatus')
+export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, guestId = '', deviceId = '', token = '') => {
+  const restaurant = await Restaurant.findOne({
+    slug: restaurantSlug.toLowerCase(),
+    isDeleted: { $ne: true },
+  })
+    .select('restaurantName slug logo coverImage description address timing paymentEnabled verificationStatus isActive')
     .lean();
 
   if (!restaurant) {
-    const error = new Error('Restaurant not found');
+    const error = new Error('Restaurant not found or unavailable');
     error.statusCode = 404;
+    throw error;
+  }
+
+  if (restaurant.isActive === false) {
+    const error = new Error('This restaurant is currently closed or suspended');
+    error.statusCode = 403;
     throw error;
   }
 
@@ -156,22 +166,24 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, gu
     };
   }
 
-  let tableQuery = { restaurantId: restaurant._id };
+  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
   const parsedNum = parseInt(tableIdentifier, 10);
   if (!isNaN(parsedNum)) {
     tableQuery.tableNumber = parsedNum;
   } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
     tableQuery._id = tableIdentifier;
   } else {
-    tableQuery.tableNumber = 1;
+    const error = new Error('Invalid table identifier specified');
+    error.statusCode = 400;
+    throw error;
   }
 
   const table = await Table.findOne(tableQuery)
-    .select('tableNumber tableName floor capacity status isActive qrUrl occupiedAt currentOrderId')
+    .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
     .lean();
 
   if (!table) {
-    const error = new Error('Table not found');
+    const error = new Error('Table not found in this restaurant');
     error.statusCode = 404;
     throw error;
   }
@@ -181,6 +193,33 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, gu
     error.statusCode = 403;
     error.code = 'TABLE_DISABLED';
     throw error;
+  }
+
+  // Validate QR token if supplied
+  const qrRecord = await QRCodeModel.findOne({
+    restaurantId: restaurant._id,
+    tableId: table._id,
+    isDeleted: false,
+  });
+
+  if (token) {
+    const activeToken = qrRecord?.qrToken || table.qrToken;
+    const isTokenActive = qrRecord ? qrRecord.isActive : table.isActive;
+
+    if (!activeToken || activeToken !== token || !isTokenActive) {
+      const error = new Error('Invalid or revoked QR code. Please scan the current table QR code.');
+      error.statusCode = 403;
+      error.code = 'INVALID_QR_TOKEN';
+      throw error;
+    }
+  }
+
+  // Track QR scan telemetry
+  if (qrRecord) {
+    QRCodeModel.findByIdAndUpdate(qrRecord._id, {
+      $inc: { scansCount: 1 },
+      lastScannedAt: new Date(),
+    }).exec().catch(() => {});
   }
 
   const [categories, menuItems] = await Promise.all([
@@ -267,12 +306,14 @@ export const getActiveCustomerOrderService = async ({ restaurantSlug, tableIdent
     .lean();
   if (!restaurant) return null;
 
-  let tableQuery = { restaurantId: restaurant._id };
+  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
   const parsedNum = parseInt(tableIdentifier, 10);
   if (!isNaN(parsedNum)) {
     tableQuery.tableNumber = parsedNum;
   } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
     tableQuery._id = tableIdentifier;
+  } else {
+    return null;
   }
   const table = await Table.findOne(tableQuery).select('_id tableNumber').lean();
   if (!table) return null;
@@ -358,14 +399,16 @@ export const placeOrderService = async (payload) => {
   }
 
   // 3. Resolve Table
-  let tableQuery = { restaurantId: restaurant._id };
+  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
   const parsedNum = parseInt(tableIdentifier, 10);
   if (!isNaN(parsedNum)) {
     tableQuery.tableNumber = parsedNum;
   } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
     tableQuery._id = tableIdentifier;
   } else {
-    tableQuery.tableNumber = 1;
+    const error = new Error('Invalid table identifier specified');
+    error.statusCode = 400;
+    throw error;
   }
 
   const table = await Table.findOne(tableQuery);

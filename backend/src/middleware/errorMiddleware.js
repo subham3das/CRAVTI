@@ -8,7 +8,7 @@ export const notFound = (req, res, next) => {
 };
 
 export const errorHandler = (err, req, res, next) => {
-  let statusCode = res.statusCode === 200 ? HTTP_STATUS.INTERNAL_SERVER_ERROR : res.statusCode;
+  let statusCode = err.statusCode || (res.statusCode === 200 ? HTTP_STATUS.INTERNAL_SERVER_ERROR : res.statusCode);
   let message = err.message || 'Internal Server Error';
 
   // Handle Mongoose Bad ObjectId

@@ -1,8 +1,12 @@
 import api from './api';
 
-export const fetchCustomerMenuApi = (restaurantSlug, tableId, guestId, deviceId) =>
+export const fetchCustomerMenuApi = (restaurantSlug, tableId, guestId, deviceId, token = '') =>
   api.get(`/order/menu/${restaurantSlug}/${tableId}`, {
-    params: { guestId, deviceId },
+    params: {
+      guestId,
+      deviceId,
+      ...(token ? { token } : {}),
+    },
   }).then(r => r.data);
 
 export const fetchActiveCustomerOrderApi = (restaurantSlug, tableId, guestId, deviceId) =>

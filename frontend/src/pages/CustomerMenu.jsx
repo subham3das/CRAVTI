@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiSearch,
@@ -29,8 +29,12 @@ import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
 const CustomerMenuContent = () => {
-  const { restaurantSlug, tableId } = useParams();
+  const { restaurantSlug, tableNumber, tableId, qrToken } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const activeTable = tableNumber || tableId || '1';
+  const activeToken = qrToken || searchParams.get('token') || searchParams.get('qrToken') || '';
 
   const {
     cart,
@@ -92,7 +96,7 @@ const CustomerMenuContent = () => {
         setError(null);
         const guestId = getOrCreateGuestId();
         const deviceId = getOrCreateDeviceId();
-        const res = await fetchCustomerMenuApi(restaurantSlug, tableId, guestId, deviceId);
+        const res = await fetchCustomerMenuApi(restaurantSlug, activeTable, guestId, deviceId, activeToken);
         if (isMounted && res.success && res.data) {
           setRestaurant(res.data.restaurant);
           setTable(res.data.table);
@@ -117,13 +121,13 @@ const CustomerMenuContent = () => {
       }
     };
 
-    if (restaurantSlug && tableId) {
+    if (restaurantSlug && activeTable) {
       loadMenu();
     }
     return () => {
       isMounted = false;
     };
-  }, [restaurantSlug, tableId]);
+  }, [restaurantSlug, activeTable, activeToken]);
 
   // 3. Filtered items based on search and category
   const filteredItems = useMemo(() => {
@@ -212,7 +216,7 @@ const CustomerMenuContent = () => {
 
       const orderPayload = {
         restaurantSlug,
-        tableIdentifier: tableId,
+        tableIdentifier: activeTable,
         guestId,
         deviceId,
         sessionId,
@@ -364,7 +368,7 @@ const CustomerMenuContent = () => {
           Your previous order has already been served.
         </h3>
         <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
-          Order <strong>#{activeOrder.orderNumber}</strong> (Table {table?.tableNumber || tableId}) is served and locked. No new items can be added to this bill.
+          Order <strong>#{activeOrder.orderNumber}</strong> (Table {table?.tableNumber || activeTable}) is served and locked. No new items can be added to this bill.
         </p>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 my-5 w-full max-w-xs text-left text-xs space-y-2 shadow-2xs">
@@ -469,7 +473,7 @@ const CustomerMenuContent = () => {
           <div className="shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-pulse" />
             <span className="font-extrabold text-xs">
-              Table {table?.tableNumber || tableId}
+              Table {table?.tableNumber || activeTable}
             </span>
           </div>
         </div>
@@ -659,7 +663,7 @@ const CustomerMenuContent = () => {
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] uppercase font-semibold text-emerald-100">
-                    Table {table?.tableNumber || tableId}
+                    Table {table?.tableNumber || activeTable}
                   </p>
                   <p className="text-sm font-extrabold leading-tight">
                     {formatCurrency(grandTotal)}
@@ -695,7 +699,7 @@ const CustomerMenuContent = () => {
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeFromCart}
         onPlaceOrder={handlePlaceOrder}
-        tableNumber={table?.tableNumber || tableId}
+        tableNumber={table?.tableNumber || activeTable}
         restaurantName={restaurant?.restaurantName || 'Restaurant'}
         isPlacingOrder={isPlacingOrder}
         hasActiveOrder={Boolean(activeOrder)}
@@ -752,7 +756,7 @@ const CustomerMenuContent = () => {
                 You already have an active order.
               </h3>
               <p className="text-xs text-slate-500 mt-1">
-                Order <strong>#{activeOrder.orderNumber}</strong> is active on Table {table?.tableNumber || tableId}.
+                Order <strong>#{activeOrder.orderNumber}</strong> is active on Table {table?.tableNumber || activeTable}.
               </p>
 
               <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3.5 my-4 text-xs space-y-1.5 text-left">
@@ -795,8 +799,9 @@ const CustomerMenuContent = () => {
 };
 
 export const CustomerMenu = () => {
-  const { restaurantSlug, tableId } = useParams();
-  const storageKey = `craviti_cart_${restaurantSlug}_${tableId}`;
+  const { restaurantSlug, tableNumber, tableId } = useParams();
+  const activeTable = tableNumber || tableId || '1';
+  const storageKey = `craviti_cart_${restaurantSlug}_${activeTable}`;
 
   return (
     <CustomerCartProvider storageKey={storageKey}>

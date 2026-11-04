@@ -19,9 +19,10 @@ import { sendSuccess } from '../utils/apiResponse.js';
 import { HTTP_STATUS } from '../constants/index.js';
 
 export const getCustomerMenu = asyncHandler(async (req, res) => {
-  const { restaurantSlug, tableId } = req.params;
-  const { guestId, deviceId } = req.query;
-  const data = await getCustomerMenuService(restaurantSlug, tableId, guestId, deviceId);
+  const { restaurantSlug, tableId, qrToken: paramToken } = req.params;
+  const { guestId, deviceId, token, qrToken: queryToken } = req.query;
+  const resolvedToken = paramToken || token || queryToken || '';
+  const data = await getCustomerMenuService(restaurantSlug, tableId, guestId, deviceId, resolvedToken);
   return sendSuccess(res, 'Menu loaded successfully', data, HTTP_STATUS.OK, { data });
 });
 

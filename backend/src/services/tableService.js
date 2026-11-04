@@ -6,7 +6,16 @@ import { QRCodeModel } from '../models/QRCode.js';
 import { Restaurant } from '../models/Restaurant.js';
 import env from '../config/env.js';
 
-const CLIENT_URL = env.CLIENT_URL;
+const getFrontendBaseUrl = () => {
+  if (process.env.QR_FRONTEND_URL) {
+    return process.env.QR_FRONTEND_URL.replace(/\/+$/, '');
+  }
+  const clientUrl = env.CLIENT_URL || process.env.CLIENT_URL;
+  if (clientUrl && !clientUrl.includes('localhost') && !clientUrl.includes('127.0.0.1')) {
+    return clientUrl.replace(/\/+$/, '');
+  }
+  return 'https://cravti.vercel.app';
+};
 
 async function getSlug(restaurantId) {
   const r = await Restaurant.findById(restaurantId).select('slug restaurantName');
@@ -28,7 +37,8 @@ async function getSlug(restaurantId) {
 
 async function buildQR(slug, tableNumber, existingToken = null) {
   const qrToken = existingToken || crypto.randomBytes(16).toString('hex');
-  const qrUrl = `${CLIENT_URL}/order/${slug}/${tableNumber}`;
+  const baseUrl = getFrontendBaseUrl();
+  const qrUrl = `${baseUrl}/order/${slug}/${tableNumber}`;
   const qrCode = await QRCode.toDataURL(qrUrl, {
     width: 300,
     margin: 2,
@@ -553,8 +563,8 @@ export const exportAllQRZipService = async (restaurantId, res) => {
 
   for (const table of tables) {
     let url = table.qrUrl;
-    if (!url) {
-      url = `${CLIENT_URL}/order/${slug}/${table.tableNumber}`;
+    if (!url || url.includes('localhost') || url.includes('127.0.0.1')) {
+      url = `${getFrontendBaseUrl()}/order/${slug}/${table.tableNumber}`;
     }
     const buffer = await QRCode.toBuffer(url, { width: 400, margin: 2 });
     const label = table.tableName

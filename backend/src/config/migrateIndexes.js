@@ -111,3 +111,4 @@ export const migrateDatabaseIndexes = async () => {
 };
 
 export default migrateDatabaseIndexes;
+

@@ -29,8 +29,10 @@ export const AppRoutes = () => {
   return (
     <Suspense fallback={<Loader fullScreen message="Loading page..." />}>
       <Routes>
-        {/* Public Customer Mobile Ordering Routes (No Login Needed) */}
-        <Route path="/order/:restaurantSlug/:tableId" element={<CustomerMenu />} />
+        {/* Public Customer Mobile Ordering Routes (No Login Required) */}
+        <Route path="/order/:restaurantSlug/:tableNumber" element={<CustomerMenu />} />
+        <Route path="/order/:restaurantSlug/:tableNumber/:qrToken" element={<CustomerMenu />} />
+        <Route path="/order/:restaurantSlug" element={<CustomerMenu />} />
         <Route path="/order/track/:orderId" element={<CustomerOrderTrack />} />
 
         {/* Public Authentication Routes */}
