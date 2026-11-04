@@ -20,8 +20,18 @@ export const errorHandler = (err, req, res, next) => {
   // Handle Mongoose duplicate key error
   if (err.code === 11000) {
     statusCode = HTTP_STATUS.CONFLICT;
-    const field = Object.keys(err.keyValue || {})[0] || 'field';
-    message = `Duplicate field value entered: ${field}. Please use another value.`;
+    const keys = Object.keys(err.keyValue || {});
+    if (keys.includes('restaurantId') && keys.includes('tableNumber')) {
+      const num = err.keyValue.tableNumber;
+      message = `Table #${num} already exists for this restaurant. Please use another table number.`;
+    } else if (keys.includes('restaurantId') && keys.includes('tableId')) {
+      message = `A QR code already exists for this table.`;
+    } else if (keys.includes('qrToken')) {
+      message = `A duplicate QR token was detected. Please regenerate the QR code.`;
+    } else {
+      const field = keys[0] || 'field';
+      message = `Duplicate field value entered: ${field}. Please use another value.`;
+    }
   }
 
   // Handle Mongoose validation errors

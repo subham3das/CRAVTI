@@ -41,6 +41,11 @@ const tableSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    qrId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'QRCode',
+      default: null,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -79,10 +84,15 @@ const tableSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-tableSchema.index({ restaurantId: 1, tableNumber: 1 });
+// CRITICAL: Compound unique index on (restaurantId, tableNumber) scoped ONLY to non-deleted tables.
+// This guarantees that soft-deleted table numbers never block new or restored tables!
+tableSchema.index(
+  { restaurantId: 1, tableNumber: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } }
+);
 tableSchema.index({ restaurantId: 1, status: 1, isDeleted: 1 });
 tableSchema.index({ restaurantId: 1, currentOrderId: 1 });
 tableSchema.index({ restaurantId: 1, isDeleted: 1 });
 
 export const Table = mongoose.model('Table', tableSchema);
-
+export default Table;

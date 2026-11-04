@@ -6,6 +6,8 @@ import {
   getTableStats,
   createTable,
   bulkCreateTables,
+  bulkGenerateQRs,
+  generateTableQR,
   updateTable,
   deleteTable,
   toggleTableActive,
@@ -16,15 +18,20 @@ import {
 const router = Router();
 router.use(protect, requireRestaurant);
 
+// Statistical & Bulk operations
 router.get('/stats', getTableStats);
 router.get('/export', exportQRZip);
+router.post('/bulk', bulkCreateTables);
+router.post('/bulk-generate-qr', bulkGenerateQRs);
+router.post('/qr/bulk', bulkGenerateQRs);
+
+// Base CRUD & QR operations
 router.get('/', getTables);
 router.post('/', createTable);
-router.post('/bulk', bulkCreateTables);
+router.post('/:id/qr', generateTableQR);
+router.post('/:id/regenerate', regenerateQR);
 router.put('/:id', updateTable);
 router.delete('/:id', deleteTable);
 router.patch('/:id/toggle', toggleTableActive);
-router.post('/:id/regenerate', regenerateQR);
 
 export default router;
-

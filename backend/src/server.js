@@ -18,6 +18,7 @@ import app from './app.js';
 import { connectDB } from './config/db.js';
 import { initSocket } from './config/socket.js';
 import { seedDefaultAdmin } from './services/adminService.js';
+import { migrateDatabaseIndexes } from './config/migrateIndexes.js';
 
 const DEFAULT_PORT = env.PORT;
 
@@ -26,7 +27,10 @@ const startServer = async () => {
     // 1. Connect Database
     await connectDB();
 
-    // 2. Seed Default Admin if needed
+    // 2. Production Index & Schema Migration
+    await migrateDatabaseIndexes();
+
+    // 3. Seed Default Admin if needed
     await seedDefaultAdmin();
 
     // 2. Create HTTP server & Socket.io

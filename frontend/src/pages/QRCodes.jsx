@@ -9,7 +9,7 @@ import { Loader } from '../components/Loader';
 import { EmptyState } from '../components/EmptyState';
 import { Button } from '../components/Button';
 import QRPreviewModal from '../components/QRPreviewModal';
-import { fetchTablesApi, exportQRZipApi } from '../services/tableService';
+import { fetchTablesApi, exportQRZipApi, bulkGenerateQRsApi } from '../services/tableService';
 import { useAuth } from '../context/AuthContext';
 
 export const QRCodes = () => {
@@ -19,12 +19,13 @@ export const QRCodes = () => {
   const [search, setSearch] = useState('');
   const [qrModal, setQrModal] = useState({ open: false, table: null });
   const [zipLoading, setZipLoading] = useState(false);
+  const [bulkQrLoading, setBulkQrLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchTablesApi({ limit: 200, search });
-      if (res.success) setTables(res.tables.filter(t => t.qrUrl));
+      if (res.success) setTables(res.tables.filter((t) => t.qrUrl));
     } catch {
       toast.error('Failed to load QR codes');
     } finally {
@@ -32,7 +33,29 @@ export const QRCodes = () => {
     }
   }, [search]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleBulkGenerateQRs = async () => {
+    setBulkQrLoading(true);
+    try {
+      const res = await bulkGenerateQRsApi();
+      if (res.success && res.data) {
+        const { newlyGenerated, existingQRCodes } = res.data;
+        if (newlyGenerated > 0) {
+          toast.success(`Generated ${newlyGenerated} new QR codes (${existingQRCodes} existing preserved)`);
+        } else {
+          toast.success(`All ${existingQRCodes} tables already have active QR codes!`);
+        }
+      }
+      load();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Bulk QR generation failed');
+    } finally {
+      setBulkQrLoading(false);
+    }
+  };
 
   const handleCopy = (qrUrl) => {
     navigator.clipboard.writeText(qrUrl).then(() => toast.success('Copied!'));
@@ -72,9 +95,19 @@ export const QRCodes = () => {
         title="QR Codes"
         description="View and download QR codes for all your tables."
         actions={
-          <Button variant="primary" size="sm" onClick={handleDownloadZip} isLoading={zipLoading}>
-            <FiDownload size={14} className="mr-1" /> Download All ZIP
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleBulkGenerateQRs}
+              isLoading={bulkQrLoading}
+            >
+              <MdQrCode2 size={15} className="mr-1 text-emerald-600" /> Sync / Generate Missing QRs
+            </Button>
+            <Button variant="primary" size="sm" onClick={handleDownloadZip} isLoading={zipLoading}>
+              <FiDownload size={14} className="mr-1" /> Download All ZIP
+            </Button>
+          </div>
         }
       />
 

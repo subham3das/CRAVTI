@@ -46,10 +46,10 @@ export default function QRPreviewModal({ isOpen, onClose, table, restaurant, onR
     setLoading(true);
     try {
       const res = await regenerateQRApi(table._id);
-      toast.success('QR regenerated!');
+      toast.success('QR code regenerated successfully!');
       onRegenerated?.(res.table);
-    } catch {
-      toast.error('Failed to regenerate QR');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to regenerate QR');
     } finally {
       setLoading(false);
     }

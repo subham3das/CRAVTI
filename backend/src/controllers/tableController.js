@@ -6,7 +6,9 @@ import {
   updateTableService,
   deleteTableService,
   toggleTableActiveService,
+  generateTableQRService,
   regenerateQRService,
+  bulkGenerateQRCodesService,
   exportAllQRZipService,
 } from '../services/tableService.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -43,6 +45,33 @@ export const bulkCreateTables = asyncHandler(async (req, res) => {
     data: { action: 'bulk_create', result },
   });
   return sendSuccess(res, 'Bulk tables created successfully', result, HTTP_STATUS.CREATED, result);
+});
+
+/**
+ * Bulk Generate QR Codes for Tables missing them
+ */
+export const bulkGenerateQRs = asyncHandler(async (req, res) => {
+  const result = await bulkGenerateQRCodesService(req.restaurantId);
+  emitSyncEvent({
+    event: SOCKET_EVENTS.QR_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'bulk_qr_generate', result },
+  });
+  return sendSuccess(res, 'Bulk QR code generation completed', result, HTTP_STATUS.OK, result);
+});
+
+/**
+ * Idempotent Single Table QR Generation
+ */
+export const generateTableQR = asyncHandler(async (req, res) => {
+  const { force } = req.body || {};
+  const result = await generateTableQRService(req.restaurantId, req.params.id, { force: Boolean(force) });
+  emitSyncEvent({
+    event: SOCKET_EVENTS.QR_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'qr_generate', table: result.table },
+  });
+  return sendSuccess(res, 'QR code generated successfully', result, HTTP_STATUS.OK, result);
 });
 
 export const updateTable = asyncHandler(async (req, res) => {
