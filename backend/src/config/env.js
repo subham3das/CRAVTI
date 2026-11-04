@@ -45,7 +45,8 @@ export const env = Object.freeze({
   EMAIL_FROM: process.env.EMAIL_FROM || 'Craviti <noreply@craviti.com>',
 
   // OTP
-  OTP_EXPIRY_MINUTES: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+  OTP_EXPIRY_MINUTES: parseInt(process.env.OTP_EXPIRY_MINUTES || process.env.OTP_EXPIRY || '10', 10),
+  OTP_LENGTH: parseInt(process.env.OTP_LENGTH || '6', 10),
 
   // Logging
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
