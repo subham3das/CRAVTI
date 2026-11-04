@@ -5,11 +5,13 @@ import { SettingsProvider } from './context/SettingsContext';
 import { AppRoutes } from './routes/AppRoutes';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { GlobalSyncWatcher } from './components/GlobalSyncWatcher';
+import { BackendHealthWatcher } from './components/BackendHealthWatcher';
 
 export function App() {
   return (
     <BrowserRouter>
       <ErrorBoundary>
+        <BackendHealthWatcher />
         <AuthProvider>
           <SettingsProvider>
             <GlobalSyncWatcher />

@@ -321,8 +321,8 @@ export const RestaurantDetails = () => {
         }));
         toast.success('Support Mode activated. Launching read-only restaurant console...');
         setSupportModal(false);
-        // Open restaurant panel with support session token
-        window.open(`http://localhost:5173/admin-support-session?token=${res.data.supportToken}&restaurantId=${restaurantId}`, '_blank');
+        const restaurantBaseUrl = import.meta.env.VITE_RESTAURANT_URL || window.location.origin;
+        window.open(`${restaurantBaseUrl}/admin-support-session?token=${res.data.supportToken}&restaurantId=${restaurantId}`, '_blank');
       }
     } catch (err) {
       toast.error(err.response?.data?.message || 'Support mode could not be activated');

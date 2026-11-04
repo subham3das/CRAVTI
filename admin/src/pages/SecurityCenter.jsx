@@ -148,7 +148,7 @@ export const SecurityCenter = () => {
                       {formatDateTime(item.createdAt || item.loginTime)}
                     </td>
                     <td className="px-4 py-3 font-bold text-slate-800">{item.adminEmail}</td>
-                    <td className="px-4 py-3 font-mono text-slate-600">{item.ip || '127.0.0.1'}</td>
+                    <td className="px-4 py-3 font-mono text-slate-600">{item.ip || '--'}</td>
                     <td className="px-4 py-3 text-slate-700">{item.os || 'Windows'} ({item.device || 'Desktop'})</td>
                     <td className="px-4 py-3 text-slate-700">{item.browser || 'Chrome'}</td>
                     <td className="px-4 py-3">

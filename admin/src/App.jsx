@@ -3,10 +3,12 @@ import { Toaster } from 'react-hot-toast';
 import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import { AppRoutes } from './routes/AppRoutes';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { BackendHealthWatcher } from './components/BackendHealthWatcher';
 
 export const App = () => {
   return (
     <ErrorBoundary>
+      <BackendHealthWatcher />
       <BrowserRouter>
         <AdminAuthProvider>
           <Toaster

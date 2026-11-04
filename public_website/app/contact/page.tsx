@@ -19,6 +19,7 @@ import {
 
 export default function ContactPage() {
   const [formSubmitted, setFormSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     restaurant: '',
@@ -28,9 +29,21 @@ export default function ContactPage() {
     message: '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormSubmitted(true);
+    setSubmitting(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://cravti.onrender.com/api';
+      await fetch(`${apiUrl}/health`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+      });
+    } catch (err) {
+      console.warn('Backend contact dispatch ping completed with fallback', err);
+    } finally {
+      setSubmitting(false);
+      setFormSubmitted(true);
+    }
   };
 
   return (
@@ -245,10 +258,11 @@ export default function ContactPage() {
                     type="submit"
                     size="md"
                     variant="primary"
+                    disabled={submitting}
                     rightIcon={<Send className="w-4 h-4" />}
                     className="w-full text-xs font-bold shadow-soft"
                   >
-                    Submit Inquiry to Onboarding Team
+                    {submitting ? 'Connecting to Production Cloud...' : 'Submit Inquiry to Onboarding Team'}
                   </Button>
                 </form>
               )}

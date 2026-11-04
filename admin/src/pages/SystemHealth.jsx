@@ -86,7 +86,9 @@ export const SystemHealth = () => {
               </div>
               <div>
                 <h3 className="font-extrabold text-sm text-[#0F172A]">API Server Node.js</h3>
-                <span className="text-[11px] text-slate-400 font-mono">Port {server.port || 5001}</span>
+                <span className="text-[11px] text-slate-400 font-mono">
+                  {server.port ? `Port ${server.port}` : 'Production API (HTTPS)'}
+                </span>
               </div>
             </div>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">

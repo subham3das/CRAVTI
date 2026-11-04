@@ -2,7 +2,8 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001/api',
+  baseURL: import.meta.env.VITE_API_URL || 'https://cravti.onrender.com/api',
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -11,6 +12,11 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    // When sending FormData, allow browser to automatically generate multipart boundary
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
+
     const token = localStorage.getItem('craviti_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -26,7 +32,7 @@ api.interceptors.response.use(
   (error) => {
     if (!error.response) {
       // Network failure
-      toast.error('Network error. Please check your internet connection.');
+      toast.error('Network error. Connecting to Craviti production server...');
       return Promise.reject(error);
     }
 

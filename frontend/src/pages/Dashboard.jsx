@@ -84,8 +84,17 @@ export const Dashboard = () => {
     const restaurantId = restaurant?._id || dashboardData?.restaurant?._id;
     if (!restaurantId) return;
 
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5001';
-    const socket = io(backendUrl, { transports: ['websocket', 'polling'] });
+    const backendUrl =
+      import.meta.env.VITE_SOCKET_URL ||
+      import.meta.env.VITE_BACKEND_URL ||
+      (import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
+
+    const socket = io(backendUrl, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+    });
 
     socket.emit('join-restaurant', restaurantId);
 
