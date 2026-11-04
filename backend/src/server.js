@@ -34,8 +34,17 @@ const startServer = async () => {
 
     const tryListen = (port) => {
       server.listen(port, () => {
-        console.log(`🚀 Craviti API Server running in ${process.env.NODE_ENV || 'development'} mode on port ${port}`);
-        console.log(`📡 Health Check: http://localhost:${port}/api/health`);
+        const envName = process.env.NODE_ENV || 'development';
+        console.log(`
+==========================================
+        CRAVITI API SERVER
+==========================================
+Environment : ${envName}
+Port        : ${port}
+Database    : Connected
+Status      : Healthy
+Version     : 1.0.0
+==========================================`);
       });
 
       server.once('error', (err) => {

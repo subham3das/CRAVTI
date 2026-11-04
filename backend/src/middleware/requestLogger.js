@@ -23,6 +23,20 @@ export const requestLogger = (req, res, next) => {
       userAgent: req.headers['user-agent'] || 'Unknown',
     };
 
+    // Do not log routine health/liveness checks as errors or clutter production logs
+    const isHealthCheck =
+      req.originalUrl === '/' ||
+      req.originalUrl === '/health' ||
+      req.originalUrl === '/live' ||
+      req.originalUrl === '/ready' ||
+      req.originalUrl === '/api/health' ||
+      req.originalUrl === '/api/live' ||
+      req.originalUrl === '/api/ready';
+
+    if (isHealthCheck && res.statusCode < 400 && process.env.NODE_ENV === 'production') {
+      return;
+    }
+
     // Compact single-line log in dev, structured JSON in prod
     if (process.env.NODE_ENV === 'production') {
       console.log(JSON.stringify(logEntry));

@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import routes from './routes/index.js';
+import healthRoutes from './routes/healthRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
@@ -78,6 +79,9 @@ app.use(cookieParser());
 
 // Serve local static uploads folder
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Production Root & Health Monitoring Endpoints (Render Health Checks)
+app.use('/', healthRoutes);
 
 // Mount API routes
 app.use('/api', routes);

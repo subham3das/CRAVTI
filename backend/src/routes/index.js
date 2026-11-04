@@ -12,7 +12,12 @@ import notificationRoutes from './notificationRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 
+import healthRoutes from './healthRoutes.js';
+
 const router = Router();
+
+// Health, Readiness & Liveness Routes
+router.use('/', healthRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
@@ -28,14 +33,5 @@ router.use('/order', orderRoutes); // Alias for customer ordering path
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
-
-// Health check endpoint
-router.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'online',
-    service: 'Craviti Restaurant Panel Backend',
-    timestamp: new Date().toISOString(),
-  });
-});
 
 export default router;
