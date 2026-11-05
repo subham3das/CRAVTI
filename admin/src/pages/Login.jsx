@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -8,7 +8,7 @@ import { useAdminAuth } from '../contexts/AdminAuthContext';
 import toast from 'react-hot-toast';
 
 export const Login = () => {
-  const { login } = useAdminAuth();
+  const { login, isAuthenticated } = useAdminAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,7 +27,16 @@ export const Login = () => {
     },
   });
 
-  const from = location.state?.from?.pathname || '/';
+  const from = (location.state?.from?.pathname && location.state.from.pathname !== '/login')
+    ? location.state.from.pathname
+    : '/';
+
+  // Automatically navigate away from /login if already authenticated or right after auth state updates
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, from, navigate]);
 
   const onSubmit = async (data) => {
     try {

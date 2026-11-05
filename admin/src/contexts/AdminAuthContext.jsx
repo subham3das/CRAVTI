@@ -23,15 +23,19 @@ export const AdminAuthProvider = ({ children }) => {
   useEffect(() => {
     let isMounted = true;
     const verifyToken = async () => {
-      if (!token) {
+      const storedToken =
+        localStorage.getItem('craviti_admin_token') || sessionStorage.getItem('craviti_admin_token');
+
+      if (!storedToken) {
         setLoading(false);
         return;
       }
 
       try {
         const res = await fetchAdminProfileApi();
-        if (isMounted && res.success && res.data?.admin) {
-          setAdmin(res.data.admin);
+        if (isMounted && res.success) {
+          const profile = res.data?.admin || res.admin;
+          if (profile) setAdmin(profile);
         }
       } catch (err) {
         if (isMounted) {
@@ -47,14 +51,21 @@ export const AdminAuthProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [token]);
+  }, [logout]);
 
   const login = async (email, password, rememberMe = true) => {
     const res = await loginAdminApi({ email, password });
-    if (res.success && res.data) {
-      const { admin: userObj, token: jwtToken } = res.data;
+    if (res.success && (res.data || res.admin)) {
+      const userObj = res.data?.admin || res.admin;
+      const jwtToken = res.data?.token || res.token;
+
+      if (!userObj || !jwtToken) {
+        throw new Error('Authentication response missing user credentials');
+      }
+
       setAdmin(userObj);
       setToken(jwtToken);
+      setLoading(false);
 
       if (rememberMe) {
         localStorage.setItem('craviti_admin_token', jwtToken);
