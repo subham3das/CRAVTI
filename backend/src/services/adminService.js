@@ -285,6 +285,7 @@ export const loginAdminService = async ({ email, password, ip = '', userAgent = 
   });
 
   const sanitizedAdmin = {
+    _id: admin._id,
     id: admin._id,
     name: admin.name,
     email: admin.email,
@@ -295,7 +296,12 @@ export const loginAdminService = async ({ email, password, ip = '', userAgent = 
     status: admin.status,
   };
 
-  return { admin: sanitizedAdmin, token };
+  return {
+    user: sanitizedAdmin,
+    admin: sanitizedAdmin,
+    token,
+    accessToken: token,
+  };
 };
 
 /**

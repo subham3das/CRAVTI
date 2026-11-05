@@ -64,11 +64,12 @@ export const adminLogin = asyncHandler(async (req, res) => {
   const userAgent = req.headers['user-agent'] || '';
 
   const result = await loginAdminService({ email, password, ip, userAgent });
-  return sendSuccess(res, 'Admin logged in successfully', result, HTTP_STATUS.OK, result);
+  return sendSuccess(res, 'Login successful', result, HTTP_STATUS.OK, result);
 });
 
 export const getAdminProfile = asyncHandler(async (req, res) => {
   const admin = {
+    _id: req.admin._id,
     id: req.admin._id,
     name: req.admin.name,
     email: req.admin.email,
@@ -77,7 +78,8 @@ export const getAdminProfile = asyncHandler(async (req, res) => {
     lastLogin: req.admin.lastLogin,
     status: req.admin.status,
   };
-  return sendSuccess(res, 'Admin profile retrieved', { admin }, HTTP_STATUS.OK, { admin });
+  const payload = { admin, user: admin };
+  return sendSuccess(res, 'Admin profile retrieved', payload, HTTP_STATUS.OK, payload);
 });
 
 export const getAdminDashboard = asyncHandler(async (req, res) => {
