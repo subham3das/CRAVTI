@@ -37,8 +37,11 @@ export const Dashboard = () => {
       try {
         setLoading(true);
         const res = await fetchBusinessDashboardApi();
-        if (isMounted && res.success && res.data) {
-          setStats(res.data);
+        if (isMounted && res?.success) {
+          const statsData = res.data || res;
+          if (statsData) {
+            setStats(statsData);
+          }
         }
       } catch (err) {
         console.error('Failed to load dashboard metrics:', err);
@@ -265,7 +268,7 @@ export const Dashboard = () => {
                       {card.label}
                     </span>
                     <div className={`w-6 h-6 rounded-lg flex items-center justify-center border text-xs shrink-0 ${card.color}`}>
-                      <Icon className="w-3.5 h-3.5" />
+                      {Icon && <Icon className="w-3.5 h-3.5" />}
                     </div>
                   </div>
                   <span className="text-xl font-black text-[#0F172A] block tracking-tight group-hover:text-blue-600 transition-colors">

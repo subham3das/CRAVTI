@@ -19,6 +19,15 @@ export const AdminAuthProvider = ({ children }) => {
 
   const [loading, setLoading] = useState(true);
 
+  const logout = useCallback(() => {
+    setAdmin(null);
+    setToken(null);
+    localStorage.removeItem('craviti_admin_token');
+    localStorage.removeItem('craviti_admin_user');
+    sessionStorage.removeItem('craviti_admin_token');
+    sessionStorage.removeItem('craviti_admin_user');
+  }, []);
+
   // Verify session on mount
   useEffect(() => {
     let isMounted = true;
@@ -83,15 +92,6 @@ export const AdminAuthProvider = ({ children }) => {
     }
     throw new Error(res.message || 'Login failed');
   };
-
-  const logout = useCallback(() => {
-    setAdmin(null);
-    setToken(null);
-    localStorage.removeItem('craviti_admin_token');
-    localStorage.removeItem('craviti_admin_user');
-    sessionStorage.removeItem('craviti_admin_token');
-    sessionStorage.removeItem('craviti_admin_user');
-  }, []);
 
   return (
     <AdminAuthContext.Provider
