@@ -86,6 +86,12 @@ export const Footer = () => {
               The complete cloud operating system for modern hospitality. Contactless QR dining, real-time Kitchen Display Systems, unified Razorpay settlements, and enterprise restaurant analytics.
             </p>
 
+            <div className="text-xs text-slate-400 space-y-1 pt-1">
+              <p><span className="text-slate-300 font-semibold">Email:</span> <a href="mailto:contactcraviti@gmail.com" className="hover:text-white transition-colors">contactcraviti@gmail.com</a></p>
+              <p><span className="text-slate-300 font-semibold">Phone:</span> <a href="tel:9954060000" className="hover:text-white transition-colors">9954060000</a></p>
+              <p><span className="text-slate-300 font-semibold">Location:</span> Dibrugarh, Assam</p>
+            </div>
+
             <div className="flex items-center gap-3 pt-2 text-slate-400">
               <a
                 href={SITE_CONFIG.socials.twitter}

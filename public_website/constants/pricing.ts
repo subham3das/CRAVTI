@@ -5,8 +5,11 @@ export const PRICING_PLANS: PricingPlan[] = [
     id: 'standard',
     name: 'Craviti Standard',
     tagline: 'Everything your restaurant needs to accept QR orders, manage tables, receive payments, and grow digitally.',
-    priceDisplay: '₹1,500',
+    priceDisplay: '₹699',
     pricePeriod: '/ month',
+    originalPrice: '₹1,500/month',
+    isLaunchOffer: true,
+    launchOfferLabel: 'Launch Offer',
     variant: 'standard',
     features: [
       'Unlimited QR Ordering',
@@ -120,7 +123,7 @@ export const PRICING_FAQ = [
   {
     question: 'Are there any setup fees or hidden costs?',
     answer:
-      'Zero setup fees, zero onboarding fees, and zero hidden sales commissions. You only pay the flat ₹1,500/month subscription for Standard, or your agreed custom plan for Enterprise.',
+      'Zero setup fees, zero onboarding fees, and zero hidden sales commissions. You only pay the flat launch offer price of ₹699/month (regular ₹1,500/month) for Standard, or your agreed custom plan for Enterprise.',
   },
   {
     question: 'How does the 14-day free trial work?',

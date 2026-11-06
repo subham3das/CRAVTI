@@ -2058,7 +2058,7 @@ export const getPlatformSubscriptionsService = async ({ search = '', plan = 'all
         status: SUBSCRIPTION_STATUS.ACTIVE,
         maxTables: 25,
         maxMenuItems: 150,
-        priceMonthly: 1499,
+        priceMonthly: 699,
         commissionPercent: 2.5,
         features: PLAN_CONFIG[SUBSCRIPTION_PLANS.PROFESSIONAL].features,
       });
@@ -2192,7 +2192,7 @@ export const generatePlatformInvoiceService = async (restaurantId, data, admin =
   const count = await PlatformInvoice.countDocuments();
   const invoiceNumber = `INV-2027-${String(count + 1).padStart(6, '0')}`;
 
-  const amount = Number(data.amount || 1499);
+  const amount = Number(data.amount || 699);
   const taxAmount = Math.round(amount * 0.05);
   const totalAmount = amount + taxAmount;
 

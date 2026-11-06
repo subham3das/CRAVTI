@@ -51,7 +51,17 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isFullPage = fal
 
               {/* Price Block */}
               <div className="pb-5 border-b border-slate-100 space-y-1">
-                <div className="flex items-baseline gap-1.5">
+                {standardPlan.isLaunchOffer && (
+                  <span className="inline-block text-[11px] font-extrabold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-0.5 rounded-full mb-1">
+                    {standardPlan.launchOfferLabel || 'Launch Offer'}
+                  </span>
+                )}
+                <div className="flex items-baseline gap-2">
+                  {standardPlan.originalPrice && (
+                    <span className="text-xl text-slate-400 line-through font-bold">
+                      {standardPlan.originalPrice}
+                    </span>
+                  )}
                   <span className="text-4xl sm:text-5xl font-extrabold text-[#111827] font-display tracking-tight">
                     {standardPlan.priceDisplay}
                   </span>
@@ -202,7 +212,10 @@ export const PricingSection: React.FC<PricingSectionProps> = ({ isFullPage = fal
                     <th className="py-4 px-6 text-center uppercase text-[11px] font-extrabold tracking-wider w-1/4 sm:w-3.5/12">
                       <div className="space-y-0.5">
                         <span className="block text-white">Craviti Standard</span>
-                        <span className="block text-[10px] text-slate-400 font-normal">₹1,500 / month</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">
+                          <span className="line-through mr-1">₹1,500/month</span>
+                          <span className="text-emerald-400 font-bold">₹699/month</span>
+                        </span>
                       </div>
                     </th>
                     <th className="py-4 px-6 text-center uppercase text-[11px] font-extrabold tracking-wider w-1/4 sm:w-3.5/12 bg-slate-900 border-l border-slate-800">

@@ -25,6 +25,9 @@ export interface PricingPlan {
   tagline: string;
   priceDisplay: string;
   pricePeriod?: string;
+  originalPrice?: string;
+  isLaunchOffer?: boolean;
+  launchOfferLabel?: string;
   features: string[];
   enterprisePlus?: string[];
   ctaText: string;

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -16,6 +17,7 @@ import {
   CheckCircle,
   HelpCircle,
   MessageSquare,
+  User,
 } from 'lucide-react';
 
 export default function ContactPage() {
@@ -35,15 +37,44 @@ export default function ContactPage() {
     setSubmitting(true);
     try {
       const apiUrl = env.API_URL;
-      await fetch(`${apiUrl}/health`, {
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
+      const res = await fetch(`${apiUrl}/contact`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          restaurant: formData.restaurant,
+          tables: formData.tables,
+          subject: formData.restaurant ? `Inquiry from ${formData.restaurant} (${formData.name})` : 'Contact Form Submission',
+          message: formData.message || `Interested in Craviti for ${formData.restaurant || 'restaurant'} (${formData.tables} tables).`,
+        }),
       });
-    } catch (err) {
-      console.warn('Backend contact dispatch ping completed with fallback', err);
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        toast.success("Thank you! Your message has been sent successfully.");
+        setFormData({
+          name: '',
+          restaurant: '',
+          email: '',
+          phone: '',
+          tables: '10-25',
+          message: '',
+        });
+        setFormSubmitted(true);
+      } else {
+        toast.error(data.message || 'Failed to send message. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Contact form submission error:', err);
+      toast.error('Network error. Please try again later.');
     } finally {
       setSubmitting(false);
-      setFormSubmitted(true);
     }
   };
 
@@ -74,12 +105,22 @@ export default function ContactPage() {
               <div className="space-y-5 text-xs sm:text-sm">
                 <div className="flex items-start gap-3.5">
                   <div className="w-9 h-9 rounded-xl bg-[#FFF7F4] border border-[#FFD5C5] text-[#FF6B35] flex items-center justify-center shrink-0">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold text-slate-400 uppercase block">Founder & CEO</span>
+                    <span className="font-bold text-slate-900 block">Subham Das</span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#FFF7F4] border border-[#FFD5C5] text-[#FF6B35] flex items-center justify-center shrink-0">
                     <Phone className="w-4 h-4" />
                   </div>
                   <div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase block">Phone Hotline</span>
-                    <a href={`tel:${SITE_CONFIG.phone}`} className="font-bold text-slate-900 hover:text-[#FF6B35]">
-                      {SITE_CONFIG.phone}
+                    <a href="tel:9954060000" className="font-bold text-slate-900 hover:text-[#FF6B35]">
+                      9954060000
                     </a>
                     <span className="text-[11px] text-slate-500 block">Mon - Sun: 8:00 AM - 11:00 PM IST</span>
                   </div>
@@ -90,12 +131,9 @@ export default function ContactPage() {
                     <Mail className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-bold text-slate-400 uppercase block">Support & Sales</span>
-                    <a href={`mailto:${SITE_CONFIG.salesEmail}`} className="font-bold text-slate-900 hover:text-[#FF6B35] block">
-                      {SITE_CONFIG.salesEmail}
-                    </a>
-                    <a href={`mailto:${SITE_CONFIG.supportEmail}`} className="text-slate-500 hover:text-[#FF6B35]">
-                      {SITE_CONFIG.supportEmail}
+                    <span className="text-[11px] font-bold text-slate-400 uppercase block">Email</span>
+                    <a href="mailto:contactcraviti@gmail.com" className="font-bold text-slate-900 hover:text-[#FF6B35] block">
+                      contactcraviti@gmail.com
                     </a>
                   </div>
                 </div>
@@ -105,9 +143,9 @@ export default function ContactPage() {
                     <MapPin className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-[11px] font-bold text-slate-400 uppercase block">Headquarters</span>
-                    <p className="text-slate-700 leading-snug">
-                      {SITE_CONFIG.address.line1}, {SITE_CONFIG.address.line2}, {SITE_CONFIG.address.city}, {SITE_CONFIG.address.state} — {SITE_CONFIG.address.pincode}
+                    <span className="text-[11px] font-bold text-slate-400 uppercase block">Location</span>
+                    <p className="text-slate-700 leading-snug font-medium">
+                      Dibrugarh, Assam, India
                     </p>
                   </div>
                 </div>

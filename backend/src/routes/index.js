@@ -17,6 +17,7 @@ import {
   getPlatformSubscriptions,
   getPlatformInvoices,
 } from '../controllers/adminController.js';
+import { submitContactInquiry } from '../controllers/contactController.js';
 import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 
 const router = Router();
@@ -37,6 +38,9 @@ router.use('/orders', orderRoutes);
 router.use('/order', orderRoutes); // Alias for customer ordering path
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);
+
+// Public Contact Form Endpoint (SMTP Dispatched to contactcraviti@gmail.com)
+router.post('/contact', submitContactInquiry);
 
 // Direct Route Aliases for Platform Revenue & Subscriptions (Tasks 5 & 9)
 router.get('/revenue', (req, res, next) => {

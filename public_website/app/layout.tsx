@@ -3,6 +3,7 @@ import { Inter, Outfit } from 'next/font/google';
 import '../styles/globals.css';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { Toaster } from 'react-hot-toast';
 import { constructMetadata } from '../lib/seo';
 import { SITE_CONFIG } from '../constants/site';
 
@@ -34,7 +35,7 @@ export default function RootLayout({
     description: SITE_CONFIG.description,
     offers: {
       '@type': 'Offer',
-      price: '1500',
+      price: '699',
       priceCurrency: 'INR',
     },
     aggregateRating: {
@@ -53,6 +54,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-white text-[#1F2937] min-h-screen flex flex-col selection:bg-[#FF6B35]/20 selection:text-[#FF6B35]">
+        <Toaster position="top-right" />
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

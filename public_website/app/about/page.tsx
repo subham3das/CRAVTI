@@ -48,21 +48,9 @@ const VALUES = [
 
 const LEADERSHIP = [
   {
-    name: 'Aaditya Vikram',
-    role: 'Co-Founder & Chief Executive Officer',
-    bio: 'Former hospitality restaurateur and software engineer passionate about modernizing culinary operations.',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'Siddharth Nair',
-    role: 'Co-Founder & Chief Technology Officer',
-    bio: 'Distributed systems architect specialized in real-time WebSockets, low-latency financial settlement rails, and high-concurrency cloud clusters.',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-  },
-  {
-    name: 'Ananya Deshmukh',
-    role: 'Head of Restaurant Success',
-    bio: 'Dedicated culinary consultant who has onboarded and optimized over 1,200 fine dining and casual hospitality establishments.',
+    name: 'Subham Das',
+    role: 'Founder & CEO',
+    bio: 'Founder and Chief Executive Officer of Craviti, dedicated to empowering restaurants with contactless QR ordering, live kitchen synchronization, and next-generation hospitality technology.',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
   },
 ];
@@ -167,7 +155,7 @@ export default function AboutPage() {
             subtitle="Hospitality veterans and software architects dedicated to your growth."
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 max-w-md mx-auto gap-8">
             {LEADERSHIP.map((lead, i) => (
               <Card key={i} className="p-6 bg-slate-50/50 space-y-4 text-center">
                 <div className="w-24 h-24 rounded-full mx-auto overflow-hidden border-2 border-[#FFD5C5] shadow-soft">

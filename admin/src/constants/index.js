@@ -112,7 +112,7 @@ export const PLAN_CONFIG = {
     badge: 'bg-blue-50 text-blue-700 border-blue-200',
     maxTables: 25,
     maxMenuItems: 150,
-    priceMonthly: 1499,
+    priceMonthly: 699, // Launch Offer (Regular ₹1,500)
     commissionPercent: 2.5,
   },
   enterprise: {

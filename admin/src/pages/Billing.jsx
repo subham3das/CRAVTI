@@ -27,7 +27,7 @@ export const Billing = () => {
   const [form, setForm] = useState({
     restaurantId: '',
     plan: 'professional',
-    amount: 1499,
+    amount: 699,
     status: 'paid',
     paymentMethod: 'Razorpay / UPI',
   });
@@ -113,16 +113,16 @@ export const Billing = () => {
           {
             itemName: `SaaS Monthly Subscription (${inv.plan})`,
             quantity: 1,
-            sellingPrice: safeNumber(inv.amount, 1499),
+            sellingPrice: safeNumber(inv.amount, 699),
             foodType: 'veg',
           },
         ],
         pricing: {
-          subtotal: safeNumber(inv.amount, 1499),
+          subtotal: safeNumber(inv.amount, 699),
           discountAmount: 0,
-          taxAmount: safeNumber(inv.taxAmount, 75),
+          taxAmount: safeNumber(inv.taxAmount, 35),
           taxRatePercent: 5,
-          finalAmount: safeNumber(inv.totalAmount, 1574),
+          finalAmount: safeNumber(inv.totalAmount, 734),
           roundOff: 0,
         },
       };

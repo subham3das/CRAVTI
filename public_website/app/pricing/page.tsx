@@ -8,7 +8,7 @@ import { HelpCircle } from 'lucide-react';
 export const metadata = constructMetadata({
   title: 'Pricing & Plans',
   description:
-    'Simple, transparent restaurant software pricing. Craviti Standard (₹1,500/mo) and Enterprise custom plans with zero setup fees and zero hidden commissions.',
+    'Simple, transparent restaurant software pricing. Craviti Standard (Launch offer: ₹699/mo, regular ₹1,500/mo) and Enterprise custom plans with zero setup fees and zero hidden commissions.',
   path: '/pricing',
 });
 

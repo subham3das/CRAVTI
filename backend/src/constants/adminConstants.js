@@ -182,7 +182,7 @@ export const PLAN_CONFIG = {
     name: 'Professional Plan',
     maxTables: 25,
     maxMenuItems: 150,
-    priceMonthly: 1499,
+    priceMonthly: 699, // Launch Offer (Regular ₹1,500)
     commissionPercent: 2.5,
     features: {
       analyticsAccess: true,
