@@ -27,28 +27,32 @@ app.use(
   })
 );
 
-const allowedOrigins = [
+const staticOrigins = [
   env.CLIENT_URL,
   env.ADMIN_CLIENT_URL,
-  ...(!env.IS_PRODUCTION
-    ? [
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'http://127.0.0.1:5175',
-      ]
-    : []),
+  env.FRONTEND_URL,
+  env.ADMIN_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5175',
 ].filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  if (staticOrigins.includes(origin)) return true;
+  // Allow all localhost and 127.0.0.1 ports (for dev & admin panels)
+  if (/^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)) return true;
+  // Allow all Craviti Vercel production & preview domains
+  if (/^https:\/\/(cravti|craviti)[a-zA-Z0-9\-_.]*\.vercel\.app$/.test(origin)) return true;
+  return false;
+};
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (
-      allowedOrigins.includes(origin) ||
-      (!env.IS_PRODUCTION && /^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin))
-    ) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     return callback(null, false);

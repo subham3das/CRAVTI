@@ -23,9 +23,14 @@ export const Revenue = () => {
   const loadRevenue = async () => {
     try {
       setLoading(true);
-      const res = await fetchPlatformRevenueApi(dateFilter);
-      if (res.success && res.data) {
-        setData(res.data);
+      const params = {};
+      if (dateFilter.startDate) params.startDate = dateFilter.startDate;
+      if (dateFilter.endDate) params.endDate = dateFilter.endDate;
+
+      const res = await fetchPlatformRevenueApi(params);
+      if (res && (res.success || res.data)) {
+        const payload = res.data?.data || res.data || res;
+        setData(payload);
       }
     } catch (err) {
       console.error('Failed to load revenue data:', err);
@@ -43,14 +48,14 @@ export const Revenue = () => {
     if (!data) return;
     const rows = [
       ['Metric', 'Value'],
-      ['Platform Gross Revenue', data.platformGrossRevenue || 0],
-      ['Restaurant Net Revenue', data.restaurantNetRevenue || 0],
+      ['Platform Gross Revenue', data.platformGrossRevenue ?? data.grossRevenue ?? 0],
+      ['Restaurant Net Revenue', data.restaurantNetRevenue ?? data.restaurantPayouts ?? 0],
       ['Commission Revenue', data.commissionRevenue || 0],
       ['Subscription Revenue', data.subscriptionRevenue || 0],
       ['Monthly Revenue', data.monthlyRevenue || 0],
       ['Today Revenue', data.todayRevenue || 0],
       ['Pending Settlements', data.pendingSettlements || 0],
-      ['Refunds Total', data.refundsTotal || 0],
+      ['Refunds Total', data.refundsTotal ?? data.refunds ?? 0],
     ];
 
     const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
@@ -149,7 +154,7 @@ export const Revenue = () => {
               Platform Gross Revenue
             </span>
             <span className="text-2xl font-black text-[#0F172A] block">
-              {formatCurrency(d.platformGrossRevenue || 0)}
+              {formatCurrency(d.platformGrossRevenue ?? d.grossRevenue ?? 0)}
             </span>
             <span className="text-[11px] text-slate-400 block mt-1">Total dining GMV processed</span>
           </div>
@@ -159,7 +164,7 @@ export const Revenue = () => {
               Restaurant Net Payouts
             </span>
             <span className="text-2xl font-black text-emerald-600 block">
-              {formatCurrency(d.restaurantNetRevenue || 0)}
+              {formatCurrency(d.restaurantNetRevenue ?? d.restaurantPayouts ?? 0)}
             </span>
             <span className="text-[11px] text-slate-400 block mt-1">Merchant earnings after commission</span>
           </div>
@@ -219,7 +224,7 @@ export const Revenue = () => {
               Total Refunds
             </span>
             <span className="text-2xl font-black text-rose-600 block">
-              {formatCurrency(d.refundsTotal || 0)}
+              {formatCurrency(d.refundsTotal ?? d.refunds ?? 0)}
             </span>
             <span className="text-[11px] text-slate-400 block mt-1">Cancelled & refunded orders</span>
           </div>
@@ -231,20 +236,23 @@ export const Revenue = () => {
         <h2 className="text-sm font-bold text-[#0F172A] uppercase tracking-wider">
           7-Day Platform Revenue Velocity
         </h2>
-        {Array.isArray(d.trend) && d.trend.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 text-xs">
-            {d.trend.map((t, idx) => (
-              <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
-                <span className="font-bold text-slate-500 block">{t.date}</span>
-                <span className="font-extrabold text-[#0F172A] text-sm block">{formatCurrency(t.revenue)}</span>
-                <span className="text-[10px] text-purple-600 font-semibold block">+{formatCurrency(t.commission)} fee</span>
-                <span className="text-[10px] text-slate-400 block">{t.orders} orders</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-slate-400 italic">No trend data available.</p>
-        )}
+        {(() => {
+          const trendList = Array.isArray(d.trend) && d.trend.length > 0 ? d.trend : (Array.isArray(d.chart) ? d.chart : []);
+          return trendList.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 text-xs">
+              {trendList.map((t, idx) => (
+                <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1">
+                  <span className="font-bold text-slate-500 block">{t.date}</span>
+                  <span className="font-extrabold text-[#0F172A] text-sm block">{formatCurrency(t.revenue)}</span>
+                  <span className="text-[10px] text-purple-600 font-semibold block">+{formatCurrency(t.commission)} fee</span>
+                  <span className="text-[10px] text-slate-400 block">{t.orders} orders</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">No trend data available.</p>
+          );
+        })()}
       </div>
 
       {/* Top & Lowest Performing Restaurants */}
@@ -255,26 +263,31 @@ export const Revenue = () => {
             <FiArrowUpRight className="w-4 h-4" />
             Top Earning Restaurants
           </h2>
-          {Array.isArray(d.topEarningRestaurants) && d.topEarningRestaurants.length > 0 ? (
-            <div className="divide-y divide-slate-100 text-xs">
-              {d.topEarningRestaurants.map((r, i) => (
-                <div key={i} className="py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-[11px]">
-                      #{i + 1}
-                    </span>
-                    <span className="font-bold text-slate-800">{r.restaurantName}</span>
+          {(() => {
+            const topList = Array.isArray(d.topEarningRestaurants) && d.topEarningRestaurants.length > 0
+              ? d.topEarningRestaurants
+              : (Array.isArray(d.topRestaurants) ? d.topRestaurants : []);
+            return topList.length > 0 ? (
+              <div className="divide-y divide-slate-100 text-xs">
+                {topList.map((r, i) => (
+                  <div key={i} className="py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-[11px]">
+                        #{i + 1}
+                      </span>
+                      <span className="font-bold text-slate-800">{r.restaurantName}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-extrabold text-[#0F172A] block">{formatCurrency(r.totalRevenue)}</span>
+                      <span className="text-[10px] text-slate-400">{r.ordersCount} orders</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-extrabold text-[#0F172A] block">{formatCurrency(r.totalRevenue)}</span>
-                    <span className="text-[10px] text-slate-400">{r.ordersCount} orders</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 italic">No restaurant sales recorded yet.</p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">No restaurant sales recorded yet.</p>
+            );
+          })()}
         </div>
 
         {/* Lowest Performing */}
@@ -283,26 +296,31 @@ export const Revenue = () => {
             <FiArrowDownRight className="w-4 h-4" />
             Lowest Performing Restaurants
           </h2>
-          {Array.isArray(d.lowestPerformingRestaurants) && d.lowestPerformingRestaurants.length > 0 ? (
-            <div className="divide-y divide-slate-100 text-xs">
-              {d.lowestPerformingRestaurants.map((r, i) => (
-                <div key={i} className="py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 font-bold flex items-center justify-center text-[11px]">
-                      #{i + 1}
-                    </span>
-                    <span className="font-bold text-slate-800">{r.restaurantName}</span>
+          {(() => {
+            const lowestList = Array.isArray(d.lowestPerformingRestaurants) && d.lowestPerformingRestaurants.length > 0
+              ? d.lowestPerformingRestaurants
+              : (Array.isArray(d.lowestRestaurants) ? d.lowestRestaurants : []);
+            return lowestList.length > 0 ? (
+              <div className="divide-y divide-slate-100 text-xs">
+                {lowestList.map((r, i) => (
+                  <div key={i} className="py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 font-bold flex items-center justify-center text-[11px]">
+                        #{i + 1}
+                      </span>
+                      <span className="font-bold text-slate-800">{r.restaurantName}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-extrabold text-[#0F172A] block">{formatCurrency(r.totalRevenue)}</span>
+                      <span className="text-[10px] text-slate-400">{r.ordersCount} orders</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-extrabold text-[#0F172A] block">{formatCurrency(r.totalRevenue)}</span>
-                    <span className="text-[10px] text-slate-400">{r.ordersCount} orders</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-slate-400 italic">No restaurant data recorded yet.</p>
-          )}
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 italic">No restaurant data recorded yet.</p>
+            );
+          })()}
         </div>
       </div>
     </div>

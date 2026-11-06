@@ -1625,12 +1625,26 @@ export const getBusinessDashboardStatsService = async () => {
 /**
  * Module 2: Platform Revenue Center
  */
-export const getPlatformRevenueStatsService = async ({ startDate = '', endDate = '' }) => {
+export const getPlatformRevenueStatsService = async ({ startDate = '', endDate = '' } = {}) => {
+  console.log('[Revenue] Service Entered: getPlatformRevenueStatsService', { startDate, endDate });
+
   const query = { status: 'completed', isDeleted: false };
   if (startDate || endDate) {
     query.createdAt = {};
-    if (startDate) query.createdAt.$gte = new Date(startDate);
-    if (endDate) query.createdAt.$lte = new Date(endDate);
+    if (startDate) {
+      const sDate = new Date(startDate);
+      if (!isNaN(sDate.getTime())) query.createdAt.$gte = sDate;
+    }
+    if (endDate) {
+      const eDate = new Date(endDate);
+      if (!isNaN(eDate.getTime())) {
+        eDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = eDate;
+      }
+    }
+    if (Object.keys(query.createdAt).length === 0) {
+      delete query.createdAt;
+    }
   }
 
   const today = new Date();
@@ -1638,50 +1652,70 @@ export const getPlatformRevenueStatsService = async ({ startDate = '', endDate =
 
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
 
-  const [
-    allCompletedOrders,
-    todayCompletedOrders,
-    monthCompletedOrders,
-    cancelledOrders,
-    invoicesPaid,
-    topRestaurantsAgg,
-  ] = await Promise.all([
-    Order.find(query).select('grandTotal restaurantId createdAt').lean(),
-    Order.find({ createdAt: { $gte: today }, status: 'completed', isDeleted: false }).select('grandTotal').lean(),
-    Order.find({ createdAt: { $gte: startOfMonth }, status: 'completed', isDeleted: false }).select('grandTotal').lean(),
-    Order.find({ status: 'cancelled', isDeleted: false }).select('grandTotal').lean(),
-    PlatformInvoice.find({ status: 'paid' }).select('totalAmount').lean(),
-    Order.aggregate([
-      { $match: { status: 'completed', isDeleted: false } },
-      {
-        $group: {
-          _id: '$restaurantId',
-          totalRevenue: { $sum: '$grandTotal' },
-          ordersCount: { $sum: 1 },
+  let allCompletedOrders = [];
+  let todayCompletedOrders = [];
+  let monthCompletedOrders = [];
+  let cancelledOrders = [];
+  let invoicesPaid = [];
+  let topRestaurantsAgg = [];
+
+  console.log('[Revenue] Mongo Query Started');
+  try {
+    const results = await Promise.all([
+      Order.find(query).select('grandTotal restaurantId createdAt').lean(),
+      Order.find({ createdAt: { $gte: today }, status: 'completed', isDeleted: false }).select('grandTotal').lean(),
+      Order.find({ createdAt: { $gte: startOfMonth }, status: 'completed', isDeleted: false }).select('grandTotal').lean(),
+      Order.find({ status: 'cancelled', isDeleted: false }).select('grandTotal').lean(),
+      PlatformInvoice.find({ status: 'paid' }).select('totalAmount').lean().catch(() => []),
+      Order.aggregate([
+        { $match: { status: 'completed', isDeleted: false } },
+        {
+          $group: {
+            _id: '$restaurantId',
+            totalRevenue: { $sum: '$grandTotal' },
+            ordersCount: { $sum: 1 },
+          },
         },
-      },
-      { $sort: { totalRevenue: -1 } },
-      {
-        $lookup: {
-          from: 'restaurants',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'restaurant',
+        { $sort: { totalRevenue: -1 } },
+        {
+          $lookup: {
+            from: 'restaurants',
+            localField: '_id',
+            foreignField: '_id',
+            as: 'restaurant',
+          },
         },
-      },
-      { $unwind: '$restaurant' },
-      {
-        $project: {
-          restaurantId: '$_id',
-          restaurantName: '$restaurant.restaurantName',
-          slug: '$restaurant.slug',
-          logo: '$restaurant.logo.url',
-          totalRevenue: 1,
-          ordersCount: 1,
+        { $unwind: '$restaurant' },
+        {
+          $project: {
+            restaurantId: '$_id',
+            restaurantName: '$restaurant.restaurantName',
+            slug: '$restaurant.slug',
+            logo: '$restaurant.logo.url',
+            totalRevenue: 1,
+            ordersCount: 1,
+          },
         },
-      },
-    ]),
-  ]);
+      ]).catch(() => []),
+    ]);
+
+    allCompletedOrders = results[0] || [];
+    todayCompletedOrders = results[1] || [];
+    monthCompletedOrders = results[2] || [];
+    cancelledOrders = results[3] || [];
+    invoicesPaid = results[4] || [];
+    topRestaurantsAgg = results[5] || [];
+    console.log('[Revenue] Mongo Query Finished successfully');
+  } catch (err) {
+    console.error('[Revenue Service Error] Mongo Query failed:', err.stack || err);
+    // Graceful zero-value fallback on error
+    allCompletedOrders = [];
+    todayCompletedOrders = [];
+    monthCompletedOrders = [];
+    cancelledOrders = [];
+    invoicesPaid = [];
+    topRestaurantsAgg = [];
+  }
 
   const platformGrossRevenue = allCompletedOrders.reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
   const todayRevenue = todayCompletedOrders.reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
@@ -1690,7 +1724,7 @@ export const getPlatformRevenueStatsService = async ({ startDate = '', endDate =
   const subscriptionRevenue = invoicesPaid.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
 
   const commissionRevenue = Math.round(platformGrossRevenue * 0.035);
-  const restaurantNetRevenue = platformGrossRevenue - commissionRevenue;
+  const restaurantNetRevenue = Math.max(0, platformGrossRevenue - commissionRevenue);
   const pendingSettlements = Math.round(restaurantNetRevenue * 0.12); // ~12% in settlement transit
 
   // 7-day revenue trend
@@ -1716,17 +1750,27 @@ export const getPlatformRevenueStatsService = async ({ startDate = '', endDate =
     });
   }
 
-  const topEarningRestaurants = topRestaurantsAgg.slice(0, 5);
-  const lowestPerformingRestaurants = topRestaurantsAgg.slice(-5).reverse();
+  const safeTopAgg = Array.isArray(topRestaurantsAgg) ? topRestaurantsAgg : [];
+  const topEarningRestaurants = safeTopAgg.slice(0, 5);
+  const lowestPerformingRestaurants = safeTopAgg.slice(-5).reverse();
 
   return {
-    platformGrossRevenue,
-    restaurantNetRevenue,
+    // Standard schema (Task 12)
+    grossRevenue: platformGrossRevenue,
     commissionRevenue,
+    restaurantPayouts: restaurantNetRevenue,
     subscriptionRevenue,
     monthlyRevenue,
     todayRevenue,
     pendingSettlements,
+    refunds: refundsTotal,
+    chart: trend,
+    topRestaurants: topEarningRestaurants,
+    lowestRestaurants: lowestPerformingRestaurants,
+
+    // Backward-compatible frontend aliases
+    platformGrossRevenue,
+    restaurantNetRevenue,
     refundsTotal,
     trend,
     topEarningRestaurants,

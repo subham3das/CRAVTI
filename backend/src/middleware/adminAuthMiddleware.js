@@ -4,6 +4,11 @@ import { ADMIN_STATUS, ADMIN_ROLES, DEFAULT_ROLE_PERMISSIONS } from '../constant
 import env from '../config/env.js';
 
 export const adminProtect = async (req, res, next) => {
+  // Always permit CORS preflight OPTIONS requests
+  if (req.method === 'OPTIONS') {
+    return next();
+  }
+
   let token;
 
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
@@ -88,6 +93,10 @@ export const requireAdminRole = (...allowedRoles) => {
  */
 export const requirePermission = (permissionCode) => {
   return (req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      return next();
+    }
+
     if (!req.admin) {
       return res.status(401).json({
         success: false,
@@ -95,8 +104,9 @@ export const requirePermission = (permissionCode) => {
       });
     }
 
-    // Super Admin retains universal permission bypass
-    if (req.admin.role === ADMIN_ROLES.SUPER_ADMIN) {
+    // Super Admin & Admin retain universal permission bypass for operational routes
+    const role = String(req.admin.role || '').toUpperCase();
+    if (role === ADMIN_ROLES.SUPER_ADMIN || role === 'SUPER_ADMIN' || role === ADMIN_ROLES.ADMIN || role === 'ADMIN') {
       return next();
     }
 

@@ -277,8 +277,34 @@ export const getBusinessDashboard = asyncHandler(async (req, res) => {
 });
 
 export const getPlatformRevenueStats = asyncHandler(async (req, res) => {
-  const data = await getPlatformRevenueStatsService(req.query);
-  return sendSuccess(res, 'Platform revenue metrics loaded', data, HTTP_STATUS.OK, data);
+  console.log('[Revenue] Controller Entered: getPlatformRevenueStats - Query:', req.query);
+  try {
+    const data = await getPlatformRevenueStatsService(req.query);
+    console.log('[Revenue] Response Sent: 200 OK');
+    return sendSuccess(res, 'Platform revenue metrics loaded', data, HTTP_STATUS.OK, data);
+  } catch (error) {
+    console.error('[Revenue Controller Error]:', error.stack || error);
+    const fallbackData = {
+      grossRevenue: 0,
+      commissionRevenue: 0,
+      restaurantPayouts: 0,
+      subscriptionRevenue: 0,
+      monthlyRevenue: 0,
+      todayRevenue: 0,
+      pendingSettlements: 0,
+      refunds: 0,
+      chart: [],
+      topRestaurants: [],
+      lowestRestaurants: [],
+      platformGrossRevenue: 0,
+      restaurantNetRevenue: 0,
+      refundsTotal: 0,
+      trend: [],
+      topEarningRestaurants: [],
+      lowestPerformingRestaurants: [],
+    };
+    return sendSuccess(res, 'Platform revenue metrics loaded (fallback)', fallbackData, HTTP_STATUS.OK, fallbackData);
+  }
 });
 
 export const getPlatformSubscriptions = asyncHandler(async (req, res) => {

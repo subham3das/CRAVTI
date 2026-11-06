@@ -87,7 +87,16 @@ router.patch('/notifications/mark-all-read', markAllAdminNotificationsRead);
 router.patch('/notifications/:id/read', markAdminNotificationRead);
 
 // Platform Revenue Center (Module 2)
-router.get('/revenue', requirePermission(PERMISSIONS.ANALYTICS_VIEW), getPlatformRevenueStats);
+router.get(
+  '/revenue',
+  (req, res, next) => {
+    console.log(`[Revenue] Incoming Request: ${req.method} ${req.originalUrl}`);
+    console.log(`[Revenue] Matched Route: GET /api/admin/revenue`);
+    next();
+  },
+  requirePermission(PERMISSIONS.ANALYTICS_VIEW),
+  getPlatformRevenueStats
+);
 
 // Payments Center (Phase 5)
 router.get('/payments', requirePermission(PERMISSIONS.ANALYTICS_VIEW), getAdminPayments);
