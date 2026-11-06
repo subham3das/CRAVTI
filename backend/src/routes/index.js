@@ -11,8 +11,13 @@ import adminRoutes from './adminRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
-
 import healthRoutes from './healthRoutes.js';
+import {
+  getPlatformRevenueStats,
+  getPlatformSubscriptions,
+  getPlatformInvoices,
+} from '../controllers/adminController.js';
+import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 
 const router = Router();
 
@@ -32,6 +37,36 @@ router.use('/orders', orderRoutes);
 router.use('/order', orderRoutes); // Alias for customer ordering path
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);
+
+// Direct Route Aliases for Platform Revenue & Subscriptions (Tasks 5 & 9)
+router.get('/revenue', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer')) {
+    return adminProtect(req, res, () => getPlatformRevenueStats(req, res, next));
+  }
+  return getPlatformRevenueStats(req, res, next);
+});
+
+router.get('/subscriptions', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer')) {
+    return adminProtect(req, res, () => getPlatformSubscriptions(req, res, next));
+  }
+  return getPlatformSubscriptions(req, res, next);
+});
+
+router.get('/billing/invoices', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer')) {
+    return adminProtect(req, res, () => getPlatformInvoices(req, res, next));
+  }
+  return getPlatformInvoices(req, res, next);
+});
+
+// Admin Panel Dedicated Namespace
 router.use('/admin', adminRoutes);
 
 export default router;

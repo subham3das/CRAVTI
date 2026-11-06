@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import {
   getCustomerMenu,
   getActiveCustomerOrder,
@@ -12,13 +13,16 @@ import {
   getOrderMetrics,
   softDeleteOrder,
 } from '../controllers/orderController.js';
+import { getAdminOrders } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import env from '../config/env.js';
 
 const router = Router();
 
 // ==========================================
-// Public Customer Ordering Routes (No Auth)
+// Customer / Public Order Tracking & Digital Menu
 // ==========================================
 router.get('/menu/:restaurantSlug/:tableId/:qrToken', getCustomerMenu);
 router.get('/menu/:restaurantSlug/:tableId', getCustomerMenu);
@@ -38,6 +42,24 @@ router.get('/metrics', protect, requireRestaurant, getOrderMetrics);
 router.patch('/:id/status', protect, requireRestaurant, updateOrderStatus);
 router.patch('/:id/payment', protect, requireRestaurant, updatePaymentStatus);
 router.delete('/:id', protect, requireRestaurant, softDeleteOrder);
-router.get('/', protect, requireRestaurant, getHistoricalOrders);
+
+// GET /api/orders - Smart route supporting Admin or Restaurant Owner
+router.get('/', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next();
+  const authHeader = req.headers.authorization || '';
+  if (authHeader.startsWith('Bearer')) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      if (decoded.type === 'admin') {
+        return adminProtect(req, res, () => getAdminOrders(req, res, next));
+      }
+    } catch (_) {}
+  }
+  return protect(req, res, (err) => {
+    if (err) return next(err);
+    requireRestaurant(req, res, () => getHistoricalOrders(req, res, next));
+  });
+});
 
 export default router;

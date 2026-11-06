@@ -10,9 +10,21 @@ const api = axios.create({
   },
 });
 
-// Request interceptor: Attach Admin Token & handle FormData
+// Request interceptor: Attach Admin Token & route normalization
 api.interceptors.request.use(
   (config) => {
+    // Ensure all admin endpoints route to /admin/... without duplication
+    const base = config.baseURL || env.API_BASE_URL || '';
+    if (base.endsWith('/admin')) {
+      if (config.url?.startsWith('/admin/')) {
+        config.url = config.url.replace(/^\/admin/, '');
+      }
+    } else {
+      if (config.url && !config.url.startsWith('/admin') && !config.url.startsWith('http')) {
+        config.url = `/admin${config.url.startsWith('/') ? '' : '/'}${config.url}`;
+      }
+    }
+
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
