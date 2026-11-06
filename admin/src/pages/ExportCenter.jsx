@@ -51,6 +51,13 @@ export const ExportCenter = () => {
       icon: FiHelpCircle,
       color: 'bg-rose-50 text-rose-700 border-rose-200',
     },
+    {
+      type: 'payments',
+      title: 'Payment Transactions & Gateway Logs',
+      description: 'Export all captured payments, refunds, failed checkouts, and Razorpay transaction IDs.',
+      icon: FiDollarSign,
+      color: 'bg-teal-50 text-teal-700 border-teal-200',
+    },
   ];
 
   const handleDownload = async (type, format) => {

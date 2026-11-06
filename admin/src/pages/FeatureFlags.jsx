@@ -55,17 +55,22 @@ export const FeatureFlags = () => {
     },
     {
       key: 'onlinePaymentEnabled',
-      title: 'Digital Payments Gateway',
+      title: 'Digital Online Payments',
       desc: 'Enables customer online prepayments via UPI, Razorpay and cards.',
     },
     {
       key: 'orderSoundsEnabled',
-      title: 'Real-time Audio Chimes',
-      desc: 'Plays auditory notifications on the kitchen panel upon new order placement.',
+      title: 'Real-time Notifications & Chimes',
+      desc: 'Broadcasts real-time socket events and auditory alerts on new orders.',
+    },
+    {
+      key: 'analyticsEnabled',
+      title: 'Platform & Restaurant Analytics',
+      desc: 'Calculates business telemetry, revenue metrics, and dining hour distribution.',
     },
     {
       key: 'receiptEnabled',
-      title: 'Thermal 80mm PDF Generation',
+      title: 'Thermal 80mm PDF Receipt Generation',
       desc: 'Generates immutable receipts on order completion for customers and restaurant staff.',
     },
     {

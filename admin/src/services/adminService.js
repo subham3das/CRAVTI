@@ -45,6 +45,18 @@ export const fetchAdminsApi = () =>
 export const createAdminApi = (data) =>
   api.post('/admin/admins', data).then((res) => res.data);
 
+export const inviteAdminApi = (data) =>
+  api.post('/admin/admins/invite', data).then((res) => res.data);
+
+export const updateAdminStatusApi = (id, status) =>
+  api.patch(`/admin/admins/${id}/status`, { status }).then((res) => res.data);
+
+export const updateAdminRoleApi = (id, role) =>
+  api.patch(`/admin/admins/${id}/role`, { role }).then((res) => res.data);
+
+export const updateAdminProfileApi = (data) =>
+  api.put('/admin/auth/profile', data).then((res) => res.data);
+
 export const globalSearchApi = (q) =>
   api.get('/admin/search', { params: { q } }).then((res) => res.data);
 

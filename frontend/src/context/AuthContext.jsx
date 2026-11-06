@@ -10,7 +10,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchSession = useCallback(async () => {
-    const token = localStorage.getItem('craviti_token');
+    // STRICT TOKEN ISOLATION: Restaurant Panel only uses restaurantAccessToken
+    const token =
+      localStorage.getItem('restaurantAccessToken') ||
+      localStorage.getItem('craviti_token');
+
     if (!token) {
       setUser(null);
       setRestaurant(null);
@@ -26,6 +30,8 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('Session verification failed:', err.message);
+      localStorage.removeItem('restaurantAccessToken');
+      localStorage.removeItem('restaurantRefreshToken');
       localStorage.removeItem('craviti_token');
       setUser(null);
       setRestaurant(null);
@@ -41,7 +47,11 @@ export const AuthProvider = ({ children }) => {
   const signup = async (userData) => {
     const res = await signupApi(userData);
     if (res.success && res.data) {
-      localStorage.setItem('craviti_token', res.data.token);
+      const token = res.data.token || res.data.accessToken;
+      const refreshToken = res.data.refreshToken || token;
+      localStorage.setItem('restaurantAccessToken', token);
+      localStorage.setItem('restaurantRefreshToken', refreshToken);
+      localStorage.setItem('craviti_token', token);
       setUser(res.data.user);
       setRestaurant(null);
       return res.data;
@@ -52,7 +62,11 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     const res = await loginApi(credentials);
     if (res.success && res.data) {
-      localStorage.setItem('craviti_token', res.data.token);
+      const token = res.data.token || res.data.accessToken;
+      const refreshToken = res.data.refreshToken || token;
+      localStorage.setItem('restaurantAccessToken', token);
+      localStorage.setItem('restaurantRefreshToken', refreshToken);
+      localStorage.setItem('craviti_token', token);
       setUser(res.data.user);
       setRestaurant(res.data.restaurant || null);
       return res.data;
@@ -61,7 +75,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    localStorage.removeItem('restaurantAccessToken');
+    localStorage.removeItem('restaurantRefreshToken');
     localStorage.removeItem('craviti_token');
+    localStorage.removeItem('craviti_user');
     setUser(null);
     setRestaurant(null);
   };

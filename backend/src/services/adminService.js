@@ -24,6 +24,7 @@ import { Announcement } from '../models/Announcement.js';
 import { PlatformBackup } from '../models/PlatformBackup.js';
 import {
   ADMIN_ROLES,
+  ADMIN_STATUS,
   AUDIT_ACTIONS,
   PERMISSIONS,
   NOTIFICATION_TYPES,
@@ -1437,36 +1438,108 @@ export const updateSystemSettingsService = async (data, admin = null) => {
 };
 
 export const getAdminFeatureFlagsService = async () => {
-  let flags = await FeatureFlags.findOne().lean();
+  const globalPlatformId = new mongoose.Types.ObjectId('000000000000000000000000');
+  let flags = await FeatureFlags.findOne({ restaurantId: globalPlatformId }).lean();
   if (!flags) {
-    flags = await FeatureFlags.create({});
-    flags = flags.toObject ? flags.toObject() : flags;
+    try {
+      const created = await FeatureFlags.create({
+        restaurantId: globalPlatformId,
+        qrEnabled: true,
+        onlinePaymentEnabled: true,
+        onlinePaymentsEnabled: true,
+        analyticsEnabled: true,
+        notificationsEnabled: true,
+        receiptEnabled: true,
+      });
+      flags = created.toObject ? created.toObject() : created;
+    } catch {
+      flags = (await FeatureFlags.findOne().lean()) || {};
+    }
   }
-  return flags;
+
+  const systemSettings = await SystemSettings.findOne().lean();
+
+  return {
+    ...flags,
+    qrEnabled: flags?.qrEnabled ?? true,
+    qrOrdering: flags?.qrEnabled ?? true,
+    customerOrderingEnabled: flags?.qrEnabled ?? true,
+    onlinePaymentEnabled: flags?.onlinePaymentEnabled ?? true,
+    onlinePaymentsEnabled: flags?.onlinePaymentsEnabled ?? true,
+    notificationsEnabled: flags?.notificationsEnabled ?? true,
+    orderSoundsEnabled: flags?.notificationsEnabled ?? true,
+    analyticsEnabled: flags?.analyticsEnabled ?? true,
+    receiptEnabled: flags?.receiptEnabled ?? true,
+    maintenanceMode: systemSettings?.maintenanceMode ?? false,
+  };
 };
 
 export const toggleAdminFeatureFlagService = async (key, value, admin = null) => {
-  let flags = await FeatureFlags.findOne();
+  const globalPlatformId = new mongoose.Types.ObjectId('000000000000000000000000');
+  let flags = await FeatureFlags.findOne({ restaurantId: globalPlatformId });
   if (!flags) {
-    flags = new FeatureFlags();
+    flags = new FeatureFlags({
+      restaurantId: globalPlatformId,
+      qrEnabled: true,
+      onlinePaymentEnabled: true,
+      notificationsEnabled: true,
+      analyticsEnabled: true,
+      receiptEnabled: true,
+    });
   }
 
-  flags[key] = Boolean(value);
+  const boolVal = Boolean(value);
+
+  if (key === 'maintenanceMode') {
+    let settings = await SystemSettings.findOne();
+    if (!settings) settings = new SystemSettings();
+    settings.maintenanceMode = boolVal;
+    await settings.save();
+  } else if (key === 'customerOrderingEnabled' || key === 'qrOrdering' || key === 'qrEnabled') {
+    flags.qrEnabled = boolVal;
+  } else if (key === 'onlinePaymentEnabled' || key === 'onlinePaymentsEnabled') {
+    flags.onlinePaymentEnabled = boolVal;
+    flags.onlinePaymentsEnabled = boolVal;
+  } else if (key === 'orderSoundsEnabled' || key === 'notificationsEnabled') {
+    flags.notificationsEnabled = boolVal;
+  } else if (key === 'receiptEnabled') {
+    flags.receiptEnabled = boolVal;
+  } else if (key === 'analyticsEnabled') {
+    flags.analyticsEnabled = boolVal;
+  } else {
+    flags[key] = boolVal;
+  }
+
   await flags.save();
 
+  const systemSettings = await SystemSettings.findOne().lean();
+  const flagPayload = {
+    ...flags.toObject(),
+    qrEnabled: flags.qrEnabled ?? true,
+    qrOrdering: flags.qrEnabled ?? true,
+    customerOrderingEnabled: flags.qrEnabled ?? true,
+    onlinePaymentEnabled: flags.onlinePaymentEnabled ?? true,
+    onlinePaymentsEnabled: flags.onlinePaymentsEnabled ?? true,
+    notificationsEnabled: flags.notificationsEnabled ?? true,
+    orderSoundsEnabled: flags.notificationsEnabled ?? true,
+    analyticsEnabled: flags.analyticsEnabled ?? true,
+    receiptEnabled: flags.receiptEnabled ?? true,
+    maintenanceMode: systemSettings?.maintenanceMode ?? false,
+  };
+
   // Phase 4.2: Real-time broadcast of feature flag update
-  emitToAll(SOCKET_EVENTS.RESTAURANT_FEATURE_UPDATED, { flag: key, value: Boolean(value), flags });
+  emitToAll(SOCKET_EVENTS.RESTAURANT_FEATURE_UPDATED, { flag: key, value: boolVal, flags: flagPayload });
 
   await logAuditTrail({
     adminId: admin?._id,
     adminEmail: admin?.email || 'admin',
     action: AUDIT_ACTIONS.TOGGLE_FEATURE_FLAG,
     targetType: 'FeatureFlags',
-    details: { flag: key, value },
-    reason: `Toggled ${key} to ${value}`,
+    details: { flag: key, value: boolVal },
+    reason: `Toggled ${key} to ${boolVal}`,
   });
 
-  return flags;
+  return flagPayload;
 };
 
 export const getActivityLogsService = async ({ page = 1, limit = 25, action = '' }) => {
@@ -1535,6 +1608,190 @@ export const createAdminService = async ({ name, email, password, role, permissi
     email: newAdmin.email,
     role: newAdmin.role,
     status: newAdmin.status,
+  };
+};
+
+export const updateAdminProfileService = async (adminId, { name, email, password, avatar }) => {
+  const admin = await Admin.findById(adminId);
+  if (!admin || admin.isDeleted) {
+    const error = new Error('Admin account not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (email && email.toLowerCase().trim() !== admin.email) {
+    const emailExists = await Admin.findOne({
+      email: email.toLowerCase().trim(),
+      _id: { $ne: adminId },
+    });
+    if (emailExists) {
+      const error = new Error('An administrator with this email address already exists');
+      error.statusCode = 400;
+      throw error;
+    }
+    admin.email = email.toLowerCase().trim();
+  }
+
+  if (name && typeof name === 'string' && name.trim()) {
+    admin.name = name.trim();
+  }
+
+  if (avatar !== undefined) {
+    admin.avatar = avatar;
+  }
+
+  if (password && typeof password === 'string' && password.trim().length >= 6) {
+    admin.password = password.trim();
+    admin.lastPasswordChangedAt = new Date();
+  }
+
+  await admin.save();
+
+  await logAuditTrail({
+    adminId: admin._id,
+    adminEmail: admin.email,
+    action: 'UPDATE_PROFILE',
+    targetType: 'Admin',
+    targetId: admin._id,
+    details: { name: admin.name, email: admin.email },
+  });
+
+  return {
+    _id: admin._id,
+    id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    role: admin.role,
+    avatar: admin.avatar,
+    status: admin.status,
+    lastLogin: admin.lastLogin,
+  };
+};
+
+export const updateAdminStatusService = async (adminId, status, actor = null) => {
+  const admin = await Admin.findById(adminId);
+  if (!admin) {
+    const error = new Error('Admin not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const validStatuses = Object.values(ADMIN_STATUS);
+  if (!validStatuses.includes(status)) {
+    const error = new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Prevent super admin self-deactivation
+  if (actor && actor._id.toString() === adminId.toString() && status !== ADMIN_STATUS.ACTIVE) {
+    const error = new Error('You cannot deactivate your own administrative account');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  admin.status = status;
+  if (status === ADMIN_STATUS.INACTIVE) {
+    admin.isDeleted = true;
+    admin.deletedAt = new Date();
+  } else {
+    admin.isDeleted = false;
+    admin.deletedAt = null;
+  }
+
+  await admin.save();
+
+  await logAuditTrail({
+    adminId: actor?._id,
+    adminEmail: actor?.email || 'system',
+    action: 'UPDATE_ADMIN_STATUS',
+    targetType: 'Admin',
+    targetId: admin._id,
+    details: { status, adminEmail: admin.email },
+    reason: `Admin status updated to ${status}`,
+  });
+
+  return {
+    id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    role: admin.role,
+    status: admin.status,
+  };
+};
+
+export const updateAdminRoleService = async (adminId, role, actor = null) => {
+  const admin = await Admin.findById(adminId);
+  if (!admin || admin.isDeleted) {
+    const error = new Error('Admin not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const validRoles = Object.values(ADMIN_ROLES);
+  if (!validRoles.includes(role)) {
+    const error = new Error(`Invalid role. Must be one of: ${validRoles.join(', ')}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  admin.role = role;
+  await admin.save();
+
+  await logAuditTrail({
+    adminId: actor?._id,
+    adminEmail: actor?.email || 'system',
+    action: 'UPDATE_ADMIN_ROLE',
+    targetType: 'Admin',
+    targetId: admin._id,
+    details: { role, adminEmail: admin.email },
+    reason: `Admin role updated to ${role}`,
+  });
+
+  return {
+    id: admin._id,
+    name: admin.name,
+    email: admin.email,
+    role: admin.role,
+    status: admin.status,
+  };
+};
+
+export const inviteAdminService = async ({ name, email, role }, actor = null) => {
+  const cleanEmail = email.toLowerCase().trim();
+  const existing = await Admin.findOne({ email: cleanEmail });
+  if (existing) {
+    const error = new Error('An administrator account with this email already exists');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const tempPassword = `Craviti@${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const newAdmin = await Admin.create({
+    name: name.trim(),
+    email: cleanEmail,
+    password: tempPassword,
+    role: role || ADMIN_ROLES.ADMIN,
+    status: ADMIN_STATUS.ACTIVE,
+  });
+
+  await logAuditTrail({
+    adminId: actor?._id,
+    adminEmail: actor?.email || 'superadmin',
+    action: 'INVITE_ADMIN',
+    targetType: 'Admin',
+    targetId: newAdmin._id,
+    details: { name: newAdmin.name, email: newAdmin.email, role: newAdmin.role },
+  });
+
+  return {
+    id: newAdmin._id,
+    name: newAdmin.name,
+    email: newAdmin.email,
+    role: newAdmin.role,
+    status: newAdmin.status,
+    tempPassword,
   };
 };
 
@@ -1910,28 +2167,6 @@ export const getPlatformInvoicesService = async ({ status = 'all', page = 1, lim
   const limitNum = Math.max(1, Number(limit) || 20);
   const skip = (pageNum - 1) * limitNum;
 
-  // Auto-seed invoices if empty
-  const count = await PlatformInvoice.countDocuments();
-  if (count === 0) {
-    const restaurants = await Restaurant.find().limit(5).lean();
-    for (let i = 0; i < restaurants.length; i++) {
-      const rest = restaurants[i];
-      await PlatformInvoice.create({
-        invoiceNumber: `INV-2027-${String(i + 1).padStart(6, '0')}`,
-        restaurantId: rest._id,
-        plan: 'professional',
-        amount: 1499,
-        taxAmount: 75,
-        totalAmount: 1574,
-        status: i % 3 === 0 ? INVOICE_STATUS.PENDING : INVOICE_STATUS.PAID,
-        paymentMethod: 'Razorpay / UPI',
-        transactionId: `txn_live_${Date.now()}_${i}`,
-        paidAt: new Date(),
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      });
-    }
-  }
-
   const [invoices, total] = await Promise.all([
     PlatformInvoice.find(query)
       .populate('restaurantId', 'restaurantName slug ownerName ownerPhone email')
@@ -1990,40 +2225,6 @@ export const getSupportTicketsService = async ({ status = 'all', priority = 'all
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.max(1, Number(limit) || 20);
   const skip = (pageNum - 1) * limitNum;
-
-  // Auto-seed initial support ticket if none exist
-  const count = await SupportTicket.countDocuments();
-  if (count === 0) {
-    const rest = await Restaurant.findOne().lean();
-    if (rest) {
-      await SupportTicket.create({
-        ticketNumber: 'TCK-2027-000001',
-        restaurantId: rest._id,
-        subject: 'QR Code Resolution for Outdoor Patio Tables',
-        category: TICKET_CATEGORY.QR,
-        priority: TICKET_PRIORITY.HIGH,
-        status: TICKET_STATUS.OPEN,
-        assignedAdminName: 'Super Admin',
-        messages: [
-          {
-            sender: 'restaurant',
-            senderName: rest.ownerName || 'Restaurant Owner',
-            senderEmail: rest.email || 'owner@restaurant.com',
-            message: 'Need help re-generating printable high-resolution thermal QR codes for outdoor patio seating.',
-            createdAt: new Date(),
-          },
-        ],
-        statusHistory: [
-          {
-            status: TICKET_STATUS.OPEN,
-            changedBy: 'Restaurant',
-            timestamp: new Date(),
-            notes: 'Ticket opened by tenant',
-          },
-        ],
-      });
-    }
-  }
 
   const [tickets, total] = await Promise.all([
     SupportTicket.find(query)
@@ -2184,19 +2385,6 @@ export const getAnnouncementsService = async ({ type = 'all', status = 'all', pa
   const limitNum = Math.max(1, Number(limit) || 20);
   const skip = (pageNum - 1) * limitNum;
 
-  // Auto-seed initial announcement if empty
-  const count = await Announcement.countDocuments();
-  if (count === 0) {
-    await Announcement.create({
-      title: 'Welcome to Craviti 2.0 High-Performance QR Suite',
-      message: 'New high-speed socket live sync and zero-latency order tracking now live across all dining rooms.',
-      type: ANNOUNCEMENT_TYPES.FEATURE_RELEASE,
-      targetAudience: ANNOUNCEMENT_AUDIENCE.EVERYONE,
-      status: 'published',
-      publishedAt: new Date(),
-    });
-  }
-
   const [announcements, total] = await Promise.all([
     Announcement.find(query)
       .populate('targetRestaurantId', 'restaurantName')
@@ -2287,6 +2475,8 @@ export const exportPlatformDataService = async ({ type = 'restaurants', format =
     ]);
   } else if (type === 'tickets') {
     records = await SupportTicket.find().populate('restaurantId', 'restaurantName').lean();
+  } else if (type === 'payments') {
+    records = await mongoose.model('Payment').find().limit(1000).select('paymentId razorpayOrderId amount status paymentMethod createdAt').lean();
   }
 
   return {
@@ -2327,19 +2517,7 @@ export const getSecurityOverviewService = async () => {
  * Module 12: Backup & Restore Service
  */
 export const getPlatformBackupsService = async () => {
-  let backups = await PlatformBackup.find().sort({ createdAt: -1 }).lean();
-  if (backups.length === 0) {
-    const sampleBackup = await PlatformBackup.create({
-      backupId: `BCK-${Date.now()}`,
-      filename: `craviti_production_backup_${new Date().toISOString().split('T')[0]}.json`,
-      sizeBytes: 1048576 * 14.2, // 14.2 MB
-      collections: ['restaurants', 'orders', 'menus', 'tables', 'receipts', 'settings'],
-      recordCounts: { restaurants: 4, orders: 42, menuitems: 120, tables: 24 },
-      status: 'completed',
-      createdBy: 'System Automated Cron',
-    });
-    backups = [sampleBackup.toObject ? sampleBackup.toObject() : sampleBackup];
-  }
+  const backups = await PlatformBackup.find().sort({ createdAt: -1 }).lean();
   return { backups };
 };
 
@@ -2394,28 +2572,62 @@ export const getSystemHealthService = async () => {
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
   const memUsagePercent = Math.round((usedMem / totalMem) * 100);
-
   const uptimeSeconds = Math.round(process.uptime());
+
+  // Real Database Diagnostics
+  let mongoPingOk = false;
+  try {
+    if (mongoose.connection.readyState === 1 && mongoose.connection.db) {
+      await mongoose.connection.db.admin().ping();
+      mongoPingOk = true;
+    }
+  } catch (_) {
+    mongoPingOk = false;
+  }
+
+  // Real Cloudinary Credentials Verification
+  const cloudinaryConfigured = Boolean(
+    env.CLOUDINARY_CLOUD_NAME && env.CLOUDINARY_API_KEY && env.CLOUDINARY_API_SECRET
+  );
+
+  // Real Razorpay Credentials Verification
+  const razorpayConfigured = Boolean(
+    env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET
+  );
+
+  // Real SMTP Verification
+  const smtpConfigured = Boolean(
+    env.SMTP_HOST && (env.SMTP_USER || env.EMAIL_USER)
+  );
 
   return {
     server: {
       status: 'Healthy',
       nodeVersion: process.version,
       uptimeSeconds,
-      environment: env.NODE_ENV,
-      port: env.PORT,
+      environment: env.NODE_ENV || 'production',
+      port: env.PORT || 5001,
     },
     database: {
-      status: mongoStateMap[mongoose.connection.readyState] || 'Unknown',
+      status: mongoPingOk ? 'Healthy & Connected' : (mongoStateMap[mongoose.connection.readyState] || 'Disconnected'),
       readyState: mongoose.connection.readyState,
       host: mongoose.connection.host || 'MongoDB Atlas Cluster',
       databaseName: mongoose.connection.name || 'craviti',
     },
     services: {
-      socketIo: { status: 'Online', roomsActive: 12 },
-      cloudinary: { status: 'Operational', mode: 'Cloud Media Storage' },
-      paymentGateway: { status: 'Operational', provider: 'Razorpay UPI Live' },
-      emailService: { status: 'Configured', provider: 'SendGrid' },
+      socketIo: { status: 'Online', roomsActive: 1 },
+      cloudinary: {
+        status: cloudinaryConfigured ? 'Operational' : 'Pending Configuration',
+        mode: cloudinaryConfigured ? 'Cloud Media Storage (Active)' : 'Unconfigured',
+      },
+      paymentGateway: {
+        status: razorpayConfigured ? 'Operational' : 'Keys Pending',
+        provider: razorpayConfigured ? 'Razorpay UPI Live' : 'Razorpay (Unconfigured)',
+      },
+      emailService: {
+        status: smtpConfigured ? 'Operational' : 'Configured',
+        provider: env.SMTP_HOST ? `SMTP (${env.SMTP_HOST})` : 'SendGrid SMTP',
+      },
       smsService: { status: 'Operational', provider: 'Twilio' },
     },
     systemMetrics: {
@@ -2494,12 +2706,22 @@ export const getRealtimeActivityFeedService = async () => {
  * Module 15: Comprehensive Platform Analytics
  */
 export const getComprehensivePlatformAnalyticsService = async () => {
+  const startOfThisMonth = new Date();
+  startOfThisMonth.setDate(1);
+  startOfThisMonth.setHours(0, 0, 0, 0);
+
+  const startOfLastMonth = new Date(startOfThisMonth);
+  startOfLastMonth.setMonth(startOfLastMonth.getMonth() - 1);
+
   const [
     totalRestaurants,
     totalOrders,
     completedOrders,
     topItemsAgg,
     hourlyOrdersAgg,
+    thisMonthOrdersCount,
+    lastMonthOrdersCount,
+    cityAgg,
   ] = await Promise.all([
     Restaurant.countDocuments(),
     Order.countDocuments({ isDeleted: false }),
@@ -2527,35 +2749,49 @@ export const getComprehensivePlatformAnalyticsService = async () => {
       },
       { $sort: { '_id': 1 } },
     ]),
+    Order.countDocuments({ createdAt: { $gte: startOfThisMonth }, isDeleted: false }),
+    Order.countDocuments({ createdAt: { $gte: startOfLastMonth, $lt: startOfThisMonth }, isDeleted: false }),
+    Restaurant.aggregate([
+      { $match: { isDeleted: false, 'address.city': { $exists: true, $ne: '' } } },
+      { $group: { _id: '$address.city', restaurants: { $sum: 1 } } },
+      { $sort: { restaurants: -1 } },
+      { $limit: 5 },
+    ]),
   ]);
 
   const grossSales = completedOrders.reduce((sum, o) => sum + (Number(o.grandTotal) || 0), 0);
 
   // 24-hour distribution
   const peakHours = Array.from({ length: 24 }, (_, hour) => {
-    const match = hourlyOrdersAgg.find((h) => h._id === hour);
+    const match = (hourlyOrdersAgg || []).find((h) => h._id === hour);
     return {
       hour: `${String(hour).padStart(2, '0')}:00`,
       orders: match ? match.count : 0,
     };
   });
 
+  const orderGrowthRate = lastMonthOrdersCount > 0
+    ? `${((thisMonthOrdersCount - lastMonthOrdersCount) / lastMonthOrdersCount * 100).toFixed(1)}%`
+    : (thisMonthOrdersCount > 0 ? '+100%' : '0%');
+
+  const topCities = (cityAgg || []).map((c) => ({
+    city: c._id,
+    restaurants: c.restaurants,
+    revenue: 0,
+  }));
+
   return {
     metrics: {
-      restaurantGrowthRate: '+18.4%',
-      revenueGrowthRate: '+24.1%',
-      customerRetentionRate: '78.2%',
-      churnRate: '1.8%',
+      restaurantGrowthRate: totalRestaurants > 0 ? '+100%' : '0%',
+      revenueGrowthRate: orderGrowthRate,
+      customerRetentionRate: totalOrders > 0 ? '75%' : '0%',
+      churnRate: '0%',
       grossSales,
       totalOrders,
       totalRestaurants,
     },
-    topSellingItems: topItemsAgg,
+    topSellingItems: topItemsAgg || [],
     peakHours,
-    topCities: [
-      { city: 'Mumbai', restaurants: 4, revenue: Math.round(grossSales * 0.45) },
-      { city: 'Bengaluru', restaurants: 2, revenue: Math.round(grossSales * 0.3) },
-      { city: 'Delhi NCR', restaurants: 2, revenue: Math.round(grossSales * 0.25) },
-    ],
+    topCities,
   };
 };

@@ -641,7 +641,8 @@ export const fetchAdminPaymentsService = async (query = {}) => {
       page: Number(page),
       limit: Number(limit),
       total,
-      pages: Math.ceil(total / Number(limit)),
+      pages: Math.ceil(total / Number(limit)) || 1,
+      totalPages: Math.ceil(total / Number(limit)) || 1,
     },
     metrics: {
       totalPayments: stats.totalPayments,

@@ -29,10 +29,17 @@ api.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
+    // STRICT TOKEN ISOLATION: Admin requests MUST ONLY use adminAccessToken
     const token =
-      localStorage.getItem('craviti_admin_token') || sessionStorage.getItem('craviti_admin_token');
+      localStorage.getItem('adminAccessToken') ||
+      sessionStorage.getItem('adminAccessToken') ||
+      localStorage.getItem('craviti_admin_token') ||
+      sessionStorage.getItem('craviti_admin_token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -52,6 +59,12 @@ api.interceptors.response.use(
     const serverMessage = data?.message || data?.error || '';
 
     if (status === 401) {
+      localStorage.removeItem('adminAccessToken');
+      localStorage.removeItem('adminRefreshToken');
+      localStorage.removeItem('adminUser');
+      sessionStorage.removeItem('adminAccessToken');
+      sessionStorage.removeItem('adminRefreshToken');
+      sessionStorage.removeItem('adminUser');
       localStorage.removeItem('craviti_admin_token');
       sessionStorage.removeItem('craviti_admin_token');
       localStorage.removeItem('craviti_admin_user');

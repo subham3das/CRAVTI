@@ -20,6 +20,10 @@ import {
   getActivityLogsService,
   getAdminsService,
   createAdminService,
+  updateAdminProfileService,
+  updateAdminStatusService,
+  updateAdminRoleService,
+  inviteAdminService,
   enhancedGlobalSearchService,
   getRestaurantDetailsFullService,
   updateRestaurantVerificationWorkflowService,
@@ -151,6 +155,27 @@ export const getAdmins = asyncHandler(async (req, res) => {
 export const createAdmin = asyncHandler(async (req, res) => {
   const admin = await createAdminService(req.body, req.admin);
   return sendSuccess(res, 'Admin account created successfully', { admin }, HTTP_STATUS.CREATED, { admin });
+});
+
+export const updateAdminProfile = asyncHandler(async (req, res) => {
+  const admin = await updateAdminProfileService(req.admin._id, req.body);
+  const payload = { admin, user: admin };
+  return sendSuccess(res, 'Admin profile updated successfully', payload, HTTP_STATUS.OK, payload);
+});
+
+export const updateAdminStatus = asyncHandler(async (req, res) => {
+  const result = await updateAdminStatusService(req.params.id, req.body.status, req.admin);
+  return sendSuccess(res, 'Admin status updated successfully', result, HTTP_STATUS.OK, result);
+});
+
+export const updateAdminRole = asyncHandler(async (req, res) => {
+  const result = await updateAdminRoleService(req.params.id, req.body.role, req.admin);
+  return sendSuccess(res, 'Admin role updated successfully', result, HTTP_STATUS.OK, result);
+});
+
+export const inviteAdmin = asyncHandler(async (req, res) => {
+  const result = await inviteAdminService(req.body, req.admin);
+  return sendSuccess(res, 'Admin invited successfully', result, HTTP_STATUS.CREATED, result);
 });
 
 export const globalSearch = asyncHandler(async (req, res) => {

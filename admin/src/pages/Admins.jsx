@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiPlus, FiUsers, FiShield, FiX, FiCheck } from 'react-icons/fi';
-import { fetchAdminsApi, createAdminApi } from '../services/adminService';
+import { FiPlus, FiUsers, FiShield, FiX, FiCheck, FiMail, FiSlash, FiUserCheck } from 'react-icons/fi';
+import {
+  fetchAdminsApi,
+  createAdminApi,
+  inviteAdminApi,
+  updateAdminStatusApi,
+  updateAdminRoleApi,
+} from '../services/adminService';
 import { ADMIN_ROLES, ROLE_COLORS } from '../constants';
 import { formatDate, formatDateTime, safeString } from '../utils/formatters';
 import { TableSkeleton } from '../components/Skeleton';
@@ -11,7 +17,9 @@ export const Admins = () => {
   const [admins, setAdmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('create'); // 'create' | 'invite'
   const [creating, setCreating] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm({
     defaultValues: {
@@ -40,17 +48,66 @@ export const Admins = () => {
   const onSubmit = async (data) => {
     try {
       setCreating(true);
-      const res = await createAdminApi(data);
+      if (modalMode === 'invite') {
+        const res = await inviteAdminApi({
+          name: data.name,
+          email: data.email,
+          role: data.role,
+        });
+        if (res.success) {
+          toast.success(
+            `Admin invited! Temporary password: ${res.data?.tempPassword || 'Generated'}`,
+            { duration: 8000 }
+          );
+          reset();
+          setModalOpen(false);
+          loadAdmins();
+        }
+      } else {
+        const res = await createAdminApi(data);
+        if (res.success) {
+          toast.success(`Admin "${data.name}" created successfully!`);
+          reset();
+          setModalOpen(false);
+          loadAdmins();
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to process admin request');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleToggleStatus = async (adm) => {
+    const nextStatus = adm.status === 'active' ? 'suspended' : 'active';
+    try {
+      setActionLoadingId(adm._id);
+      const res = await updateAdminStatusApi(adm._id, nextStatus);
       if (res.success) {
-        toast.success(`Admin "${data.name}" created successfully!`);
-        reset();
-        setModalOpen(false);
+        toast.success(`Admin "${adm.name}" is now ${nextStatus.toUpperCase()}`);
         loadAdmins();
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create admin');
+      toast.error(err.response?.data?.message || 'Failed to update admin status');
     } finally {
-      setCreating(false);
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleChangeRole = async (adm, newRole) => {
+    if (newRole === adm.role) return;
+    try {
+      setActionLoadingId(adm._id);
+      const res = await updateAdminRoleApi(adm._id, newRole);
+      if (res.success) {
+        toast.success(`Role for "${adm.name}" updated to ${newRole}`);
+        loadAdmins();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to change admin role');
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -67,21 +124,38 @@ export const Admins = () => {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setModalOpen(true)}
-          className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 self-start sm:self-auto cursor-pointer"
-        >
-          <FiPlus className="w-4 h-4" />
-          <span>Add Platform Admin</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => {
+              setModalMode('invite');
+              setModalOpen(true);
+            }}
+            className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <FiMail className="w-3.5 h-3.5" />
+            <span>Invite Admin</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setModalMode('create');
+              setModalOpen(true);
+            }}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-md shadow-blue-500/20 flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <FiPlus className="w-4 h-4" />
+            <span>Add Platform Admin</span>
+          </button>
+        </div>
       </div>
 
       {/* Admins Table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {loading ? (
           <div className="p-6">
-            <TableSkeleton rows={4} cols={4} />
+            <TableSkeleton rows={4} cols={5} />
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -90,9 +164,10 @@ export const Admins = () => {
                 <tr>
                   <th className="px-5 py-3.5">Admin Name</th>
                   <th className="px-5 py-3.5">Email</th>
-                  <th className="px-5 py-3.5">Role</th>
-                  <th className="px-5 py-3.5">Status</th>
-                  <th className="px-5 py-3.5 text-right">Created Date</th>
+                  <th className="px-5 py-3.5">Role Management</th>
+                  <th className="px-5 py-3.5">Account Status</th>
+                  <th className="px-5 py-3.5">Created Date</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -112,21 +187,48 @@ export const Admins = () => {
                     </td>
                     <td className="px-5 py-3.5 text-slate-600 font-mono text-[11px]">{adm.email}</td>
                     <td className="px-5 py-3.5">
-                      <span
-                        className={`inline-block text-[10px] font-extrabold uppercase tracking-wide px-2 py-0.5 rounded border ${
+                      <select
+                        value={adm.role}
+                        onChange={(e) => handleChangeRole(adm, e.target.value)}
+                        disabled={actionLoadingId === adm._id}
+                        className={`text-[10px] font-extrabold uppercase tracking-wide px-2 py-1 rounded border cursor-pointer focus:outline-none ${
                           ROLE_COLORS[adm.role] || 'bg-slate-50 text-slate-700'
                         }`}
                       >
-                        {adm.role}
-                      </span>
+                        {Object.values(ADMIN_ROLES).map((r) => (
+                          <option key={r} value={r}>
+                            {r}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      <span
+                        className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                          adm.status === 'active'
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                            : 'text-rose-700 bg-rose-50 border-rose-200'
+                        }`}
+                      >
                         {adm.status}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right font-mono text-[11px] text-slate-400">
+                    <td className="px-5 py-3.5 font-mono text-[11px] text-slate-400">
                       {formatDate(adm.createdAt)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === adm._id}
+                        onClick={() => handleToggleStatus(adm)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer border ${
+                          adm.status === 'active'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                            : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {adm.status === 'active' ? 'Deactivate' : 'Activate'}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -136,17 +238,19 @@ export const Admins = () => {
         )}
       </div>
 
-      {/* Create Admin Modal */}
+      {/* Create / Invite Admin Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs" onClick={() => setModalOpen(false)} />
           <div className="relative bg-white w-full max-w-md rounded-2xl shadow-2xl p-6 z-10 border border-slate-100">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-base font-bold text-[#0F172A]">Create New Administrator</h3>
+              <h3 className="text-base font-bold text-[#0F172A]">
+                {modalMode === 'invite' ? 'Invite Platform Administrator' : 'Create New Administrator'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100"
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 cursor-pointer"
               >
                 <FiX className="w-4 h-4" />
               </button>
@@ -179,21 +283,29 @@ export const Admins = () => {
                 {errors.email && <p className="text-[11px] text-rose-500 mt-1">{errors.email.message}</p>}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                  Initial Password
-                </label>
-                <input
-                  type="password"
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: { value: 6, message: 'Minimum 6 characters' },
-                  })}
-                  placeholder="••••••••••••"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none"
-                />
-                {errors.password && <p className="text-[11px] text-rose-500 mt-1">{errors.password.message}</p>}
-              </div>
+              {modalMode === 'create' && (
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Initial Password
+                  </label>
+                  <input
+                    type="password"
+                    {...register('password', {
+                      required: modalMode === 'create' ? 'Password is required' : false,
+                      minLength: { value: 6, message: 'Minimum 6 characters' },
+                    })}
+                    placeholder="••••••••••••"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 focus:outline-none"
+                  />
+                  {errors.password && <p className="text-[11px] text-rose-500 mt-1">{errors.password.message}</p>}
+                </div>
+              )}
+
+              {modalMode === 'invite' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700">
+                  An administrative account will be provisioned with a secure temporary password.
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
@@ -215,17 +327,17 @@ export const Admins = () => {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  className="flex-1 py-2.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-500/20 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-blue-500/20 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {creating && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                  <span>Save Account</span>
+                  <span>{modalMode === 'invite' ? 'Send Invitation' : 'Save Account'}</span>
                 </button>
               </div>
             </form>
@@ -235,4 +347,3 @@ export const Admins = () => {
     </div>
   );
 };
-

@@ -66,7 +66,7 @@ export const Analytics = () => {
             Restaurant Growth
           </span>
           <span className="text-2xl font-black text-emerald-600 block">
-            {metrics.restaurantGrowthRate || '+18.4%'}
+            {metrics.restaurantGrowthRate ?? '0%'}
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">Month-over-month</span>
         </div>
@@ -76,7 +76,7 @@ export const Analytics = () => {
             Revenue Growth
           </span>
           <span className="text-2xl font-black text-blue-600 block">
-            {metrics.revenueGrowthRate || '+24.1%'}
+            {metrics.revenueGrowthRate ?? '0%'}
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">Platform gross billings</span>
         </div>
@@ -86,7 +86,7 @@ export const Analytics = () => {
             Customer Retention
           </span>
           <span className="text-2xl font-black text-purple-600 block">
-            {metrics.customerRetentionRate || '78.2%'}
+            {metrics.customerRetentionRate ?? '0%'}
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">30-day returning diners</span>
         </div>
@@ -96,7 +96,7 @@ export const Analytics = () => {
             Tenant Churn Rate
           </span>
           <span className="text-2xl font-black text-emerald-600 block">
-            {metrics.churnRate || '1.8%'}
+            {metrics.churnRate ?? '0%'}
           </span>
           <span className="text-[11px] text-slate-400 block mt-1">Industry low SLA</span>
         </div>
@@ -171,24 +171,28 @@ export const Analytics = () => {
             <FiMapPin className="w-4 h-4 text-emerald-600" />
             Top Dining Geographic Hubs
           </h2>
-          <div className="divide-y divide-slate-100 text-xs">
-            {topCities.map((c, i) => (
-              <div key={i} className="py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-[11px]">
-                    #{i + 1}
-                  </span>
-                  <div>
-                    <span className="font-bold text-slate-800 block">{c.city}</span>
-                    <span className="text-[10px] text-slate-400">{c.restaurants} Partner Outlets</span>
+          {topCities.length > 0 ? (
+            <div className="divide-y divide-slate-100 text-xs">
+              {topCities.map((c, i) => (
+                <div key={i} className="py-2.5 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 font-bold flex items-center justify-center text-[11px]">
+                      #{i + 1}
+                    </span>
+                    <div>
+                      <span className="font-bold text-slate-800 block">{c.city}</span>
+                      <span className="text-[10px] text-slate-400">{c.restaurants} Partner Outlets</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-extrabold text-[#0F172A] block">{formatCurrency(c.revenue)}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-extrabold text-[#0F172A] block">{formatCurrency(c.revenue)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">No geographic data recorded yet.</p>
+          )}
         </div>
       </div>
     </div>

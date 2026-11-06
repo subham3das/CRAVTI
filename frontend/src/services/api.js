@@ -18,9 +18,29 @@ api.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
-    const token = localStorage.getItem('craviti_token');
+    // STRICT TOKEN ISOLATION:
+    // Customer ordering routes MUST NEVER send restaurant or admin tokens
+    const isPublicCustomerRoute =
+      config.url?.includes('/menu/') ||
+      config.url?.includes('/order/menu') ||
+      config.url?.includes('/customer') ||
+      config.url?.startsWith('/orders/menu') ||
+      window.location.pathname.startsWith('/order/');
+
+    if (isPublicCustomerRoute) {
+      delete config.headers.Authorization;
+      return config;
+    }
+
+    // Restaurant requests ONLY use restaurantAccessToken
+    const token =
+      localStorage.getItem('restaurantAccessToken') ||
+      localStorage.getItem('craviti_token');
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -45,6 +65,8 @@ api.interceptors.response.use(
       case 401:
         // Unauthorized
         if (currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/order/')) {
+          localStorage.removeItem('restaurantAccessToken');
+          localStorage.removeItem('restaurantRefreshToken');
           localStorage.removeItem('craviti_token');
           localStorage.removeItem('craviti_user');
           toast.error('Session expired. Please log in again.');

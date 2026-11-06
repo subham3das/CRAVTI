@@ -15,6 +15,10 @@ import {
   getActivityLogs,
   getAdmins,
   createAdmin,
+  updateAdminProfile,
+  updateAdminStatus,
+  updateAdminRole,
+  inviteAdmin,
   globalSearch,
   getRestaurantDetailsFull,
   updateRestaurantVerification,
@@ -74,6 +78,8 @@ router.post('/auth/login', authLimiter, adminLogin);
 router.use(adminProtect);
 
 router.get('/auth/me', getAdminProfile);
+router.put('/auth/profile', updateAdminProfile);
+router.patch('/auth/profile', updateAdminProfile);
 
 // Phase 3 Module 1: Upgraded Platform Business Dashboard
 router.get('/dashboard', getBusinessDashboard);
@@ -182,6 +188,9 @@ router.put('/settings', requireRoleOrSuperAdmin(ADMIN_ROLES.SUPER_ADMIN), update
 // Admin Team Management (Super Admin only)
 router.get('/admins', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), getAdmins);
 router.post('/admins', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), createAdmin);
+router.post('/admins/invite', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), inviteAdmin);
+router.patch('/admins/:id/status', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), updateAdminStatus);
+router.patch('/admins/:id/role', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), updateAdminRole);
 
 function requireRoleOrSuperAdmin(role) {
   return requireAdminRole(role);
