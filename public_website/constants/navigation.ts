@@ -39,6 +39,7 @@ export const FOOTER_NAV = {
     { label: 'Customer Terms', href: '/customer-terms' },
     { label: 'Refund Policy', href: '/refund-policy' },
     { label: 'Cancellation Policy', href: '/cancellation-policy' },
+    { label: 'Shipping & Delivery Policy', href: '/shipping-policy' },
     { label: 'Cookie Policy', href: '/cookie-policy' },
     { label: 'Data Processing (DPA)', href: '/data-processing-agreement' },
     { label: 'Security Policy', href: '/security-policy' },

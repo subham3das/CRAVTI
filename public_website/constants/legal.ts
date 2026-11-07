@@ -186,6 +186,54 @@ We provide a 30-day grace period following subscription expiration during which 
       },
     ],
   },
+  'shipping-policy': {
+    title: 'Shipping & Delivery Policy',
+    slug: 'shipping-policy',
+    lastUpdated: 'March 1, 2026',
+    effectiveDate: 'March 1, 2026',
+    summary:
+      'Information on how digital software subscriptions, table QR code placards, and physical onboarding collateral are fulfilled, dispatched, and delivered by Craviti.',
+    sections: [
+      {
+        id: 'digital-services-fulfillment',
+        title: '1. Electronic Software Delivery',
+        content: `
+Craviti is primarily a Software-as-a-Service (SaaS) cloud platform. Access to all purchased digital products, including the Restaurant Dashboard, Digital QR Ordering menus, Kitchen Display Systems, and Business Analytics, is provisioned immediately upon account activation or successful online subscription verification. No physical shipping is required to utilize core software services.
+        `,
+      },
+      {
+        id: 'physical-qr-stands-shipping',
+        title: '2. Physical QR Table Stands & Placards',
+        content: `
+For hospitality partners requesting physical custom-engraved acrylic or metallic QR table placards, orders are processed and customized within 2 to 3 business days of menu finalization. Shipments are dispatched through reputable domestic courier and express cargo partners (e.g., Blue Dart, Delhivery, DTDC).
+        `,
+      },
+      {
+        id: 'delivery-timelines',
+        title: '3. Estimated Delivery Timelines',
+        content: `
+- **Tier 1 & Metro Cities:** 3 to 5 business days from dispatch.
+- **Tier 2 & Tier 3 Cities:** 5 to 7 business days from dispatch.
+- **Remote / Special Regions (e.g., North-East, Island territories):** 7 to 10 business days from dispatch.
+Estimated timelines may be subject to operational courier delays, public holidays, or adverse weather conditions.
+        `,
+      },
+      {
+        id: 'order-tracking',
+        title: '4. Shipment Tracking',
+        content: `
+Once physical merchandise or placards are handed over to the courier partner, an automated dispatch notification containing the courier tracking airway bill (AWB) number and live tracking link will be sent to the merchant's registered email address and phone number.
+        `,
+      },
+      {
+        id: 'damaged-shipments',
+        title: '5. Transit Damages & Replacements',
+        content: `
+In the rare event that custom table placards or physical collateral arrive damaged, chipped, or defective during courier transit, please report the issue with photographic proof to contactcraviti@gmail.com within 48 hours of delivery receipt. Craviti will re-manufacture and dispatch replacement units at zero additional charge.
+        `,
+      },
+    ],
+  },
   'cookie-policy': {
     title: 'Cookie Policy',
     slug: 'cookie-policy',

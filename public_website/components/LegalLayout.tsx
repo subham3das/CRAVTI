@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { LegalDocument } from '../types';
 import { Badge } from './Badge';
 import { Button } from './Button';
@@ -10,7 +11,7 @@ import {
   Clock,
   Printer,
   ChevronRight,
-  ArrowLeft,
+  ChevronDown,
   FileText,
 } from 'lucide-react';
 
@@ -18,7 +19,28 @@ interface LegalLayoutProps {
   document: LegalDocument;
 }
 
+export const LEGAL_NAVIGATION = [
+  { label: 'Privacy Policy', href: '/privacy-policy', slug: 'privacy-policy' },
+  { label: 'Terms & Conditions', href: '/terms-and-conditions', slug: 'terms-and-conditions' },
+  { label: 'Refund Policy', href: '/refund-policy', slug: 'refund-policy' },
+  { label: 'Cancellation Policy', href: '/cancellation-policy', slug: 'cancellation-policy' },
+  { label: 'Shipping & Delivery Policy', href: '/shipping-policy', slug: 'shipping-policy' },
+  { label: 'Cookie Policy', href: '/cookie-policy', slug: 'cookie-policy' },
+  { label: 'Disclaimer', href: '/disclaimer', slug: 'disclaimer' },
+  { label: 'Security Policy', href: '/security-policy', slug: 'security-policy' },
+  { label: 'Merchant Agreement', href: '/merchant-agreement', slug: 'merchant-agreement' },
+  { label: 'Customer Terms', href: '/customer-terms', slug: 'customer-terms' },
+  { label: 'Data Processing (DPA)', href: '/data-processing-agreement', slug: 'data-processing-agreement' },
+  { label: 'Acceptable Use Policy', href: '/acceptable-use-policy', slug: 'acceptable-use-policy' },
+  { label: 'GDPR Compliance', href: '/gdpr', slug: 'gdpr' },
+  { label: 'CCPA Privacy', href: '/ccpa', slug: 'ccpa' },
+  { label: 'Contact & Legal', href: '/contact', slug: 'contact' },
+];
+
 export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
+  const router = useRouter();
+  const pathname = usePathname();
+
   return (
     <div className="pt-28 pb-20 bg-slate-50/50 min-h-screen">
       {/* Breadcrumb Bar */}
@@ -28,7 +50,7 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
             Home
           </Link>
           <ChevronRight className="w-3 h-3 text-slate-400" />
-          <span className="text-slate-400">Legal</span>
+          <span className="text-slate-400">Legal Center</span>
           <ChevronRight className="w-3 h-3 text-slate-400" />
           <span className="text-slate-900 font-bold">{document.title}</span>
         </div>
@@ -75,33 +97,145 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
           </div>
         </div>
 
-        {/* Content Grid with Sticky Table of Contents */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Sticky Sidebar Navigation */}
-          <aside className="lg:col-span-4 sticky top-28 space-y-4">
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-soft">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                Table of Contents
-              </h3>
-              <nav className="space-y-1">
+        {/* Mobile Legal Center Dropdown (Mobile View) */}
+        <div className="lg:hidden mb-6 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-soft space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>Legal Pages</span>
+            </span>
+            <span className="text-[10px] font-bold uppercase text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+              {document.title}
+            </span>
+          </div>
+
+          <div className="relative">
+            <select
+              value={pathname}
+              onChange={(e) => {
+                if (e.target.value) {
+                  router.push(e.target.value);
+                }
+              }}
+              aria-label="Legal Pages Dropdown"
+              className="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-xl py-3 pl-3.5 pr-10 appearance-none focus:outline-hidden focus:border-blue-500 cursor-pointer"
+            >
+              <option value="" disabled>
+                Legal Pages ▼
+              </option>
+              {LEGAL_NAVIGATION.map((item) => {
+                const isActive = pathname === item.href || document.slug === item.slug;
+                return (
+                  <option key={item.href} value={item.href}>
+                    📄 {item.label} {isActive ? '← Active' : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
+          {/* Collapsible On This Page for mobile */}
+          {document.sections && document.sections.length > 0 && (
+            <details className="pt-2 border-t border-slate-100 group">
+              <summary className="text-xs font-bold text-slate-600 cursor-pointer flex items-center justify-between py-1 list-none">
+                <span>On This Page ({document.sections.length} sections)</span>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="pt-2 space-y-1">
                 {document.sections.map((section) => (
                   <a
                     key={section.id}
                     href={`#${section.id}`}
-                    className="block px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-[#FF6B35] hover:bg-[#FFF7F4] transition-colors truncate"
+                    className="block text-xs text-slate-600 hover:text-blue-600 py-1 pl-2 border-l border-slate-200 hover:border-blue-500 truncate"
                   >
                     {section.title}
                   </a>
                 ))}
+              </div>
+            </details>
+          )}
+        </div>
+
+        {/* Content Grid with Sticky Sidebar Navigation (Desktop) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Sticky Sidebar Navigation (Desktop) */}
+          <aside className="hidden lg:block lg:col-span-4 sticky top-28 space-y-4 max-h-[calc(100vh-8.5rem)] overflow-y-auto pr-1">
+            <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-soft">
+              {/* Legal Center Header */}
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs">
+                    §
+                  </div>
+                  <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 font-display">
+                    Legal Center
+                  </h3>
+                </div>
+                <span className="text-[10px] font-bold text-slate-400">
+                  {LEGAL_NAVIGATION.length} Docs
+                </span>
+              </div>
+
+              {/* Legal Documents Links */}
+              <nav className="space-y-1">
+                {LEGAL_NAVIGATION.map((item) => {
+                  const isActive = pathname === item.href || document.slug === item.slug;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors ${
+                        isActive
+                          ? 'bg-blue-50 text-blue-600 font-bold border-l-2 border-blue-600 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <span className="text-xs shrink-0">{isActive ? '📘' : '📄'}</span>
+                        <span className="truncate">{item.label}</span>
+                      </span>
+                      {isActive && (
+                        <span className="text-[10px] font-extrabold text-blue-600 shrink-0 ml-1.5">
+                          ← Active
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
               </nav>
 
-              <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+              {/* Preserved Current Section Table of Contents: ON THIS PAGE */}
+              {document.sections && document.sections.length > 0 && (
+                <>
+                  <div className="border-t border-slate-100 my-4" />
+                  <div className="space-y-2">
+                    <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 px-1">
+                      On This Page
+                    </h4>
+                    <nav className="space-y-1">
+                      {document.sections.map((section) => (
+                        <a
+                          key={section.id}
+                          href={`#${section.id}`}
+                          className="block px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 transition-colors truncate"
+                        >
+                          {section.title}
+                        </a>
+                      ))}
+                    </nav>
+                  </div>
+                </>
+              )}
+
+              {/* Compliance Contact */}
+              <div className="mt-5 pt-4 border-t border-slate-100 space-y-2">
                 <span className="text-[11px] text-slate-400 block">
                   Questions regarding our policies?
                 </span>
                 <Link
                   href="/contact"
-                  className="text-xs font-bold text-[#FF6B35] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
                 >
                   <span>Contact Legal & Compliance</span>
                   <ChevronRight className="w-3 h-3" />
@@ -109,6 +243,7 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
               </div>
             </div>
 
+            {/* Enterprise Security Box */}
             <div className="bg-gradient-to-br from-slate-900 to-[#111827] rounded-2xl p-5 text-white shadow-soft space-y-3">
               <div className="flex items-center gap-2 text-[#FF6B35]">
                 <Shield className="w-4 h-4" />
