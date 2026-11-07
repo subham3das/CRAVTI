@@ -1,4 +1,5 @@
 import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FiPlus, FiMinus, FiClock, FiStar, FiThumbsUp } from 'react-icons/fi';
 import { CustomerVegBadge } from './CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
@@ -10,6 +11,7 @@ export const CustomerMenuCard = React.memo(({
   onAdd,
   onUpdateQuantity,
   onSelect,
+  onOpenModal,
 }) => {
   const isOutOfStock = item?.availability === 'out_of_stock';
   const hasDiscount = item?.discountType && item.discountType !== 'none' && safeNumber(item.discountValue) > 0;
@@ -18,6 +20,7 @@ export const CustomerMenuCard = React.memo(({
 
   const handleCardClick = () => {
     if (onSelect) onSelect(item);
+    else if (onOpenModal) onOpenModal(item);
   };
 
   const handleAddClick = (e) => {
@@ -37,34 +40,40 @@ export const CustomerMenuCard = React.memo(({
   };
 
   return (
-    <div
+    <motion.div
       onClick={handleCardClick}
-      className={`bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm active:scale-[0.99] transition-all cursor-pointer flex gap-3 relative overflow-hidden ${
-        isOutOfStock ? 'opacity-60 grayscale-[40%]' : 'hover:border-slate-200'
+      whileTap={{ scale: 0.985 }}
+      whileHover={{ y: -1.5 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      className={`bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm hover:border-slate-200 transition-all cursor-pointer flex gap-3 relative overflow-hidden select-none ${
+        isOutOfStock ? 'opacity-60 grayscale-[40%]' : ''
       }`}
     >
       {/* Left: Info */}
       <div className="flex-1 flex flex-col justify-between min-w-0 pr-1">
         <div>
           {/* Top Row: Type & Badges */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+          <div className="flex items-center gap-1.5 mb-1.5 flex-nowrap overflow-hidden">
             <CustomerVegBadge type={item?.foodType} />
 
             {isPopular && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200/80">
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full border border-amber-200/80 shrink-0">
                 <FiStar className="w-2.5 h-2.5 fill-amber-500 text-amber-500" /> Popular
               </span>
             )}
 
             {isRecommended && (
-              <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/80">
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full border border-emerald-200/80 shrink-0">
                 <FiThumbsUp className="w-2.5 h-2.5 text-emerald-600" /> Must Try
               </span>
             )}
           </div>
 
-          {/* Item Name */}
-          <h3 className="font-bold text-sm text-slate-900 leading-snug line-clamp-1">
+          {/* Item Name - Displays Full Name with 2-line headroom */}
+          <h3
+            className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 break-words"
+            title={item?.itemName}
+          >
             {item?.itemName ?? 'Dish'}
           </h3>
 
@@ -99,13 +108,13 @@ export const CustomerMenuCard = React.memo(({
       </div>
 
       {/* Right: Image & Add Stepper */}
-      <div className="w-24 shrink-0 flex flex-col justify-between items-center">
-        <div className="w-24 h-24 rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100 shadow-2xs">
+      <div className="w-22 sm:w-24 shrink-0 flex flex-col justify-between items-center">
+        <div className="w-22 h-22 sm:w-24 sm:h-24 rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100 shadow-2xs">
           <ImageWithFallback
             src={item?.image?.url}
             alt={item?.itemName}
             type="menu"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
           />
 
           {isOutOfStock && (
@@ -117,7 +126,7 @@ export const CustomerMenuCard = React.memo(({
           )}
         </div>
 
-        {/* Add Button / Stepper */}
+        {/* Add Button / Stepper with Framer Motion */}
         <div className="mt-2 w-full">
           {isOutOfStock ? (
             <button
@@ -126,36 +135,52 @@ export const CustomerMenuCard = React.memo(({
             >
               Unavailable
             </button>
-          ) : quantity === 0 ? (
-            <button
-              type="button"
-              onClick={handleAddClick}
-              className="w-full py-1.5 bg-emerald-50 hover:bg-[#16A34A] text-[#16A34A] hover:text-white border border-[#16A34A]/40 hover:border-[#16A34A] rounded-xl text-xs font-bold tracking-wider transition-all shadow-sm flex items-center justify-center gap-1 active:scale-95"
-            >
-              <FiPlus className="w-3.5 h-3.5" /> ADD
-            </button>
           ) : (
-            <div className="w-full flex items-center justify-between bg-[#16A34A] text-white rounded-xl px-2 py-1 shadow-sm">
-              <button
-                type="button"
-                onClick={handleDecrement}
-                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-emerald-700 active:scale-90 transition-transform"
-              >
-                <FiMinus className="w-3.5 h-3.5" />
-              </button>
-              <span className="text-xs font-bold px-1">{quantity}</span>
-              <button
-                type="button"
-                onClick={handleIncrement}
-                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-emerald-700 active:scale-90 transition-transform"
-              >
-                <FiPlus className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <AnimatePresence mode="wait">
+              {quantity === 0 ? (
+                <motion.button
+                  key="add"
+                  type="button"
+                  onClick={handleAddClick}
+                  whileTap={{ scale: 0.92 }}
+                  whileHover={{ scale: 1.02 }}
+                  className="w-full py-1.5 bg-emerald-50 hover:bg-[#16A34A] text-[#16A34A] hover:text-white border border-[#16A34A]/40 hover:border-[#16A34A] rounded-xl text-xs font-bold tracking-wider transition-colors shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <FiPlus className="w-3.5 h-3.5" /> ADD
+                </motion.button>
+              ) : (
+                <motion.div
+                  key="stepper"
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  className="w-full flex items-center justify-between bg-[#16A34A] text-white rounded-xl px-1.5 py-1 shadow-sm"
+                >
+                  <motion.button
+                    type="button"
+                    onClick={handleDecrement}
+                    whileTap={{ scale: 0.8 }}
+                    className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition-colors"
+                  >
+                    <FiMinus className="w-3.5 h-3.5" />
+                  </motion.button>
+                  <span className="text-xs font-extrabold px-1">{quantity}</span>
+                  <motion.button
+                    type="button"
+                    onClick={handleIncrement}
+                    whileTap={{ scale: 0.8 }}
+                    className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-emerald-700 transition-colors"
+                  >
+                    <FiPlus className="w-3.5 h-3.5" />
+                  </motion.button>
+                </motion.div>
+              )}
+            </AnimatePresence>
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 });
 

@@ -566,9 +566,9 @@ const CustomerMenuContent = () => {
               <h2 className="font-extrabold text-slate-900 text-sm">Chef's Recommendations</h2>
             </div>
 
-            <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
+            <div className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-4 px-4 scrollbar-none no-scrollbar snap-x snap-mandatory">
               {(Array.isArray(popularItems) ? popularItems : []).map((item) => (
-                <div key={item._id} className="w-[200px] shrink-0">
+                <div key={item._id} className="w-[285px] sm:w-[305px] shrink-0 snap-start">
                   <CustomerMenuCard
                     item={item}
                     quantity={getItemQuantity(item._id)}
