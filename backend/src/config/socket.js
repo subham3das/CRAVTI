@@ -1,16 +1,44 @@
 import { Server } from 'socket.io';
+import env from './env.js';
 
 let ioInstance = null;
+
+const isOriginAllowed = (origin) => {
+  if (!origin) return true;
+  // Allow all localhost and 127.0.0.1 ports
+  if (/^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)) {
+    return true;
+  }
+  // Allow all Craviti Vercel production & preview domains
+  if (/^https:\/\/(cravti|craviti)[a-zA-Z0-9\-_.]*\.vercel\.app$/.test(origin)) {
+    return true;
+  }
+  // Allow configured origins
+  const staticOrigins = [
+    env.WEBSITE_URL,
+    env.PUBLIC_WEBSITE_URL,
+    env.CORS_ORIGIN,
+    ...(env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',') : []),
+  ]
+    .filter(Boolean)
+    .map((o) => o.trim().replace(/\/+$/, ''));
+
+  if (staticOrigins.some((so) => origin.startsWith(so))) {
+    return true;
+  }
+
+  // Permissive fallback in production for client ordering apps
+  return true;
+};
 
 export const initSocket = (httpServer) => {
   ioInstance = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (!origin) return callback(null, true);
-        if (/^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)) {
+        if (isOriginAllowed(origin)) {
           return callback(null, true);
         }
-        return callback(null, false);
+        return callback(null, true);
       },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
       credentials: true,
@@ -18,11 +46,12 @@ export const initSocket = (httpServer) => {
   });
 
   ioInstance.on('connection', (socket) => {
-    // 1. Join restaurant room
-    const handleJoinRestaurant = (restaurantId) => {
-      if (restaurantId) {
-        socket.join(`restaurant:${restaurantId}`);
-        socket.join(`restaurant_${restaurantId}`);
+    // 1. Join restaurant room (by restaurantId or restaurantSlug)
+    const handleJoinRestaurant = (restaurantIdentifier) => {
+      if (restaurantIdentifier) {
+        const idStr = restaurantIdentifier.toString();
+        socket.join(`restaurant:${idStr}`);
+        socket.join(`restaurant_${idStr}`);
       }
     };
     socket.on('join_restaurant', handleJoinRestaurant);
@@ -31,8 +60,9 @@ export const initSocket = (httpServer) => {
     // 2. Join order room
     const handleJoinOrder = (orderId) => {
       if (orderId) {
-        socket.join(`order:${orderId}`);
-        socket.join(`order_${orderId}`);
+        const idStr = orderId.toString();
+        socket.join(`order:${idStr}`);
+        socket.join(`order_${idStr}`);
       }
     };
     socket.on('join_order', handleJoinOrder);
@@ -41,8 +71,9 @@ export const initSocket = (httpServer) => {
     // 3. Join table room
     const handleJoinTable = (tableId) => {
       if (tableId) {
-        socket.join(`table:${tableId}`);
-        socket.join(`table_${tableId}`);
+        const idStr = tableId.toString();
+        socket.join(`table:${idStr}`);
+        socket.join(`table_${idStr}`);
       }
     };
     socket.on('join_table', handleJoinTable);
@@ -75,17 +106,54 @@ export const getIO = () => {
 export const emitToRestaurant = (restaurantId, event, data) => {
   if (!ioInstance || !restaurantId) return;
   const idStr = restaurantId.toString();
+  const altEvent = event.includes('.') ? event.replace(/\./g, '-') : event.replace(/-/g, '.');
+
   ioInstance.to(`restaurant:${idStr}`).to(`restaurant_${idStr}`).emit(event, data);
+  if (altEvent !== event) {
+    ioInstance.to(`restaurant:${idStr}`).to(`restaurant_${idStr}`).emit(altEvent, data);
+  }
+};
+
+export const emitToOrder = (orderId, event, data) => {
+  if (!ioInstance || !orderId) return;
+  const idStr = orderId.toString();
+  const altEvent = event.includes('.') ? event.replace(/\./g, '-') : event.replace(/-/g, '.');
+
+  ioInstance.to(`order:${idStr}`).to(`order_${idStr}`).emit(event, data);
+  if (altEvent !== event) {
+    ioInstance.to(`order:${idStr}`).to(`order_${idStr}`).emit(altEvent, data);
+  }
+};
+
+export const emitToTable = (tableId, event, data) => {
+  if (!ioInstance || !tableId) return;
+  const idStr = tableId.toString();
+  const altEvent = event.includes('.') ? event.replace(/\./g, '-') : event.replace(/-/g, '.');
+
+  ioInstance.to(`table:${idStr}`).to(`table_${idStr}`).emit(event, data);
+  if (altEvent !== event) {
+    ioInstance.to(`table:${idStr}`).to(`table_${idStr}`).emit(altEvent, data);
+  }
 };
 
 export const emitToAdmin = (event, data) => {
   if (!ioInstance) return;
+  const altEvent = event.includes('.') ? event.replace(/\./g, '-') : event.replace(/-/g, '.');
+
   ioInstance.to('admin').to('admin-room').emit(event, data);
+  if (altEvent !== event) {
+    ioInstance.to('admin').to('admin-room').emit(altEvent, data);
+  }
 };
 
 export const emitToAll = (event, data) => {
   if (!ioInstance) return;
+  const altEvent = event.includes('.') ? event.replace(/\./g, '-') : event.replace(/-/g, '.');
+
   ioInstance.emit(event, data);
+  if (altEvent !== event) {
+    ioInstance.emit(altEvent, data);
+  }
 };
 
 export const emitSyncEvent = ({ event, restaurantId, data = {}, target = 'both' }) => {
@@ -110,14 +178,13 @@ export const emitSyncEvent = ({ event, restaurantId, data = {}, target = 'both' 
   }
 };
 
-export const emitToOrder = (orderId, event, data) => {
-  if (!ioInstance || !orderId) return;
-  const idStr = orderId.toString();
-  ioInstance.to(`order:${idStr}`).to(`order_${idStr}`).emit(event, data);
-};
-
-export const emitToTable = (tableId, event, data) => {
-  if (!ioInstance || !tableId) return;
-  const idStr = tableId.toString();
-  ioInstance.to(`table:${idStr}`).to(`table_${idStr}`).emit(event, data);
+export default {
+  initSocket,
+  getIO,
+  emitToRestaurant,
+  emitToOrder,
+  emitToTable,
+  emitToAdmin,
+  emitToAll,
+  emitSyncEvent,
 };

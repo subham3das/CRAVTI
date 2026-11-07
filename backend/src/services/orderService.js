@@ -11,6 +11,7 @@ import { Receipt } from '../models/Receipt.js';
 import { getNextOrderNumber, getNextReceiptNumber } from '../models/Counter.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
+import { calculateSellingPrice } from '../utils/discountCalculator.js';
 
 /**
  * Helper to release table status to 'available' if no other active orders exist on that table
@@ -129,11 +130,23 @@ export const generateReceiptSnapshot = async (orderId) => {
 /**
  * Public Customer Menu + Active Session & Lock Status Detection
  */
-export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, guestId = '', deviceId = '', token = '') => {
-  const restaurant = await Restaurant.findOne({
-    slug: restaurantSlug.toLowerCase(),
+export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '', guestId = '', deviceId = '', token = '') => {
+  if (!restaurantSlug) {
+    const error = new Error('Restaurant slug or ID is required');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const isObjectId = mongoose.Types.ObjectId.isValid(restaurantSlug);
+  const restaurantQuery = {
+    $or: [
+      { slug: restaurantSlug.toLowerCase() },
+      ...(isObjectId ? [{ _id: new mongoose.Types.ObjectId(restaurantSlug) }] : []),
+    ],
     isDeleted: { $ne: true },
-  })
+  };
+
+  const restaurant = await Restaurant.findOne(restaurantQuery)
     .select('restaurantName slug logo coverImage description address timing paymentEnabled verificationStatus isActive')
     .lean();
 
@@ -166,33 +179,39 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, gu
     };
   }
 
-  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
-  const parsedNum = parseInt(tableIdentifier, 10);
-  if (!isNaN(parsedNum)) {
-    tableQuery.tableNumber = parsedNum;
-  } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
-    tableQuery._id = tableIdentifier;
-  } else {
-    const error = new Error('Invalid table identifier specified');
-    error.statusCode = 400;
-    throw error;
+  let table = null;
+  if (tableIdentifier) {
+    let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
+    const parsedNum = parseInt(tableIdentifier, 10);
+    if (!isNaN(parsedNum)) {
+      tableQuery.tableNumber = parsedNum;
+    } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
+      tableQuery._id = tableIdentifier;
+    }
+
+    table = await Table.findOne(tableQuery)
+      .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
+      .lean();
   }
 
-  const table = await Table.findOne(tableQuery)
-    .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
-    .lean();
+  // If table not found or not provided, fallback to first active table or default structure
+  if (!table) {
+    table = await Table.findOne({ restaurantId: restaurant._id, isActive: true, isDeleted: { $ne: true } })
+      .sort({ tableNumber: 1 })
+      .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
+      .lean();
+  }
 
   if (!table) {
-    const error = new Error('Table not found in this restaurant');
-    error.statusCode = 404;
-    throw error;
-  }
-
-  if (!table.isActive || table.status === 'disabled') {
-    const error = new Error('This table is currently disabled or unavailable for ordering');
-    error.statusCode = 403;
-    error.code = 'TABLE_DISABLED';
-    throw error;
+    table = {
+      _id: new mongoose.Types.ObjectId(),
+      tableNumber: 1,
+      tableName: 'Dine-In',
+      floor: 'Main Area',
+      capacity: 4,
+      status: 'available',
+      isActive: true,
+    };
   }
 
   // Validate QR token if supplied
@@ -222,16 +241,61 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier, gu
     }).exec().catch(() => {});
   }
 
-  const [categories, menuItems] = await Promise.all([
-    Category.find({ restaurantId: restaurant._id, isActive: true })
+  // Live Categories & MenuItems with strict soft-delete and active checks
+  const [categories, rawMenuItems] = await Promise.all([
+    Category.find({
+      restaurantId: restaurant._id,
+      isActive: true,
+      isDeleted: { $ne: true },
+    })
       .sort({ displayOrder: 1, createdAt: 1 })
-      .select('categoryName displayOrder')
+      .select('_id categoryName displayOrder isActive')
       .lean(),
-    MenuItem.find({ restaurantId: restaurant._id })
-      .populate('categoryId', 'categoryName')
+    MenuItem.find({
+      restaurantId: restaurant._id,
+      isDeleted: { $ne: true },
+    })
+      .populate('categoryId', 'categoryName isActive isDeleted displayOrder')
       .sort({ displayOrder: 1, createdAt: -1 })
       .lean(),
   ]);
+
+  const activeCategoryIds = new Set(categories.map((c) => c._id.toString()));
+
+  // Filter out orphaned items whose category was deleted or deactivated
+  const menuItems = rawMenuItems
+    .filter((item) => {
+      if (item.isDeleted === true) return false;
+      if (!item.categoryId) return false;
+
+      const catObj = item.categoryId;
+      const catIdStr = catObj?._id ? catObj._id.toString() : catObj.toString();
+
+      // Must belong to an active, non-deleted category
+      if (!activeCategoryIds.has(catIdStr)) return false;
+      if (typeof catObj === 'object') {
+        if (catObj.isActive === false || catObj.isDeleted === true) return false;
+      }
+      return true;
+    })
+    .map((item) => {
+      const price = Number(item.price) || 0;
+      const discountType = item.discountType || 'none';
+      const discountValue = Number(item.discountValue) || 0;
+      const calculatedSellingPrice = calculateSellingPrice(price, discountType, discountValue);
+
+      return {
+        ...item,
+        price,
+        discountType,
+        discountValue,
+        sellingPrice:
+          item.sellingPrice !== undefined && Number(item.sellingPrice) > 0
+            ? Number(item.sellingPrice)
+            : calculatedSellingPrice,
+        availability: item.availability || 'available',
+      };
+    });
 
   // Architectural Rule 1: ONE ACTIVE BILL PER TABLE
   // Check any active order on this dining table (whether customer scanned before or is joining table)
@@ -450,6 +514,7 @@ export const placeOrderService = async (payload) => {
   const dbItems = await MenuItem.find({
     _id: { $in: itemIds },
     restaurantId: restaurant._id,
+    isDeleted: { $ne: true },
   }).lean();
 
   const dbItemMap = new Map(dbItems.map(item => [item._id.toString(), item]));

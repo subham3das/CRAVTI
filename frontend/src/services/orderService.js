@@ -1,13 +1,42 @@
 import api from './api';
 
-export const fetchCustomerMenuApi = (restaurantSlug, tableId, guestId, deviceId, token = '') =>
-  api.get(`/order/menu/${restaurantSlug}/${tableId}`, {
-    params: {
-      guestId,
-      deviceId,
-      ...(token ? { token } : {}),
-    },
-  }).then(r => r.data);
+export const fetchCustomerMenuApi = (restaurantSlug, tableId, guestId, deviceId, token = '') => {
+  const url = tableId
+    ? `/order/menu/${restaurantSlug}/${tableId}`
+    : `/order/menu/${restaurantSlug}`;
+
+  return api
+    .get(url, {
+      params: {
+        guestId,
+        deviceId,
+        ...(token ? { token } : {}),
+        _t: Date.now(), // Anti-cache parameter ensures live production DB records
+      },
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+        Expires: '0',
+      },
+    })
+    .then((r) => r.data);
+};
+
+export const fetchCustomerCategoriesApi = (restaurantSlug) =>
+  api
+    .get(`/customer/categories/${restaurantSlug}`, {
+      params: { _t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+    })
+    .then((r) => r.data);
+
+export const fetchCustomerMenuItemsApi = (restaurantSlug, params = {}) =>
+  api
+    .get(`/customer/menu-items/${restaurantSlug}`, {
+      params: { ...params, _t: Date.now() },
+      headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+    })
+    .then((r) => r.data);
 
 export const fetchActiveCustomerOrderApi = (restaurantSlug, tableId, guestId, deviceId) =>
   api.get(`/order/active-session/${restaurantSlug}/${tableId}`, {

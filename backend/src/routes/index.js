@@ -14,6 +14,7 @@ import paymentRoutes from './paymentRoutes.js';
 import healthRoutes from './healthRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import restaurantPaymentRoutes from './restaurantPaymentRoutes.js';
+import customerRoutes from './customerRoutes.js';
 import {
   getPlatformRevenueStats,
   getPlatformSubscriptions,
@@ -41,6 +42,7 @@ router.use('/menu', menuRoutes);
 router.use('/tables', tableRoutes);
 router.use('/orders', orderRoutes);
 router.use('/order', orderRoutes); // Alias for customer ordering path
+router.use('/customer', customerRoutes); // Customer public menu & categories APIs
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);
 

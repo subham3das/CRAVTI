@@ -30,3 +30,4 @@ router.get('/export', exportRestaurantPaymentsCSV);
 router.get('/', getRestaurantPaymentsList);
 
 export default router;
+

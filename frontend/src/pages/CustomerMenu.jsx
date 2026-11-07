@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { io } from 'socket.io-client';
+import env from '../config/env';
 import {
   FiSearch,
   FiX,
@@ -44,6 +46,7 @@ const CustomerMenuContent = () => {
     removeFromCart,
     clearCart,
     getItemQuantity,
+    syncCartWithLiveMenu,
     totalCount,
     subtotal,
     discount,
@@ -88,47 +91,89 @@ const CustomerMenuContent = () => {
     };
   }, []);
 
-  // 2. Fetch Restaurant, Table, Menu & Active Table Order
-  useEffect(() => {
-    let isMounted = true;
-    const loadMenu = async () => {
+  // 2. Fetch Restaurant, Table, Menu & Active Table Order (Single Source of Truth)
+  const loadMenu = useCallback(
+    async (isSilent = false) => {
       try {
-        setLoading(true);
+        if (!isSilent) setLoading(true);
         setError(null);
         const guestId = getOrCreateGuestId();
         const deviceId = getOrCreateDeviceId();
-        const res = await fetchCustomerMenuApi(restaurantSlug, activeTable, guestId, deviceId, activeToken);
-        if (isMounted && res.success && res.data) {
+        const res = await fetchCustomerMenuApi(
+          restaurantSlug,
+          activeTable,
+          guestId,
+          deviceId,
+          activeToken
+        );
+        if (res.success && res.data) {
           setRestaurant(res.data.restaurant);
           setTable(res.data.table);
           setCategories(res.data.categories || []);
-          setMenuItems(res.data.menuItems || []);
+          const liveItems = res.data.menuItems || [];
+          setMenuItems(liveItems);
           setSettings(res.data.settings || null);
           setIsOrderLocked(Boolean(res.data.isOrderLocked));
           setWaitingForPayment(Boolean(res.data.waitingForPayment));
           if (res.data.activeOrder) {
             setActiveOrder(res.data.activeOrder);
           }
+          // Live sync cart items with latest prices and availability
+          if (typeof syncCartWithLiveMenu === 'function') {
+            syncCartWithLiveMenu(liveItems);
+          }
         }
       } catch (err) {
-        if (isMounted) {
+        if (!isSilent) {
           const msg =
             err.response?.data?.message ||
-            'Could not load restaurant menu. Please scan table QR again.';
+            'Unable to load menu. Please scan table QR again or try again.';
           setError(msg);
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (!isSilent) setLoading(false);
       }
+    },
+    [restaurantSlug, activeTable, activeToken, syncCartWithLiveMenu]
+  );
+
+  useEffect(() => {
+    if (restaurantSlug && activeTable) {
+      loadMenu(false);
+    }
+  }, [loadMenu, restaurantSlug, activeTable]);
+
+  // 3. Real-Time Socket.IO Synchronization with Restaurant Panel
+  useEffect(() => {
+    if (!restaurant?._id) return;
+    const socketUrl =
+      env.SOCKET_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const socket = io(socketUrl, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 5,
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join-restaurant', restaurant._id);
+      if (restaurantSlug) socket.emit('join-restaurant', restaurantSlug);
+      if (table?._id) socket.emit('join-table', table._id);
+    });
+
+    const handleMenuSync = () => {
+      loadMenu(true);
     };
 
-    if (restaurantSlug && activeTable) {
-      loadMenu();
-    }
+    socket.on('menu.updated', handleMenuSync);
+    socket.on('menu-updated', handleMenuSync);
+    socket.on('category.updated', handleMenuSync);
+    socket.on('category-updated', handleMenuSync);
+    socket.on('restaurant.updated', handleMenuSync);
+    socket.on('restaurant.settings.updated', handleMenuSync);
+
     return () => {
-      isMounted = false;
+      socket.disconnect();
     };
-  }, [restaurantSlug, activeTable, activeToken]);
+  }, [restaurant?._id, restaurantSlug, table?._id, loadMenu]);
 
   // 3. Filtered items based on search and category
   const filteredItems = useMemo(() => {
@@ -418,11 +463,14 @@ const CustomerMenuContent = () => {
         <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
           <FiAlertCircle className="w-8 h-8" />
         </div>
-        <h3 className="font-bold text-slate-900 text-base">Unable to Open Menu</h3>
-        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">{error}</p>
+        <h3 className="font-bold text-slate-900 text-base">Unable to load menu.</h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
+          {error || 'Please try again.'}
+        </p>
         <button
-          onClick={() => window.location.reload()}
-          className="mt-6 px-6 py-2.5 rounded-xl bg-[#16A34A] text-white font-bold text-xs shadow-md"
+          type="button"
+          onClick={() => loadMenu(false)}
+          className="mt-6 px-6 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer"
         >
           Retry
         </button>
@@ -527,120 +575,149 @@ const CustomerMenuContent = () => {
       )}
 
       {/* Sticky Category Chips Horizontal Scroll */}
-      <div className={`bg-white/95 backdrop-blur-md px-3 py-2 border-b border-slate-100 sticky ${activeOrder && dismissActivePrompt ? 'top-[144px]' : 'top-[108px]'} z-30 overflow-x-auto scrollbar-none flex gap-2`}>
-        <button
-          type="button"
-          onClick={() => handleCategoryClick('ALL')}
-          className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-            activeCategory === 'ALL'
-              ? 'bg-[#16A34A] text-white shadow-sm shadow-emerald-500/20'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
+      {categories.length > 0 && (
+        <div
+          className={`bg-white/95 backdrop-blur-md px-3 py-2 border-b border-slate-100 sticky ${
+            activeOrder && dismissActivePrompt ? 'top-[144px]' : 'top-[108px]'
+          } z-30 overflow-x-auto scrollbar-none flex gap-2`}
         >
-          All Items
-        </button>
-
-        {(Array.isArray(categories) ? categories : []).map((cat) => (
           <button
-            key={cat._id}
             type="button"
-            onClick={() => handleCategoryClick(cat._id)}
+            onClick={() => handleCategoryClick('ALL')}
             className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
-              activeCategory === cat._id
+              activeCategory === 'ALL'
                 ? 'bg-[#16A34A] text-white shadow-sm shadow-emerald-500/20'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            {cat.categoryName}
+            All Items
           </button>
-        ))}
-      </div>
+
+          {(Array.isArray(categories) ? categories : []).map((cat) => (
+            <button
+              key={cat._id}
+              type="button"
+              onClick={() => handleCategoryClick(cat._id)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                activeCategory === cat._id
+                  ? 'bg-[#16A34A] text-white shadow-sm shadow-emerald-500/20'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {cat.categoryName}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 space-y-6">
-        {/* Popular / Recommended Items */}
-        {activeCategory === 'ALL' && !searchQuery.trim() && popularItems.length > 0 && (
-          <section className="space-y-3">
-            <div className="flex items-center gap-1.5">
-              <FiStar className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <h2 className="font-extrabold text-slate-900 text-sm">Chef's Recommendations</h2>
+        {menuItems.length === 0 ? (
+          <div className="py-20 text-center px-4 space-y-3">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-[#16A34A] border border-emerald-100 flex items-center justify-center mx-auto shadow-2xs">
+              <MdRestaurantMenu className="w-8 h-8" />
             </div>
-
-            <div className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-4 px-4 scrollbar-none no-scrollbar snap-x snap-mandatory">
-              {(Array.isArray(popularItems) ? popularItems : []).map((item) => (
-                <div key={item._id} className="w-[285px] sm:w-[305px] shrink-0 snap-start">
-                  <CustomerMenuCard
-                    item={item}
-                    quantity={getItemQuantity(item._id)}
-                    onAdd={() => addToCart(item, 1)}
-                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                    onOpenModal={() => setSelectedItem(item)}
-                  />
-                </div>
-              ))}
+            <div className="space-y-1">
+              <h3 className="font-extrabold text-slate-800 text-base">Menu is being prepared.</h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                Please check back soon.
+              </p>
             </div>
-          </section>
-        )}
-
-        {/* Grouped Section or Filtered Flat List */}
-        {groupedItems ? (
-          groupedItems.map(([catId, group]) => (
-            <section
-              key={catId}
-              ref={(el) => (categorySectionRefs.current[catId] = el)}
-              className="space-y-3 pt-2"
+            <button
+              type="button"
+              onClick={() => loadMenu(false)}
+              className="mt-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200/90 shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
-                <h3 className="font-extrabold text-slate-900 text-sm">{group.categoryName}</h3>
-                <span className="text-[11px] font-bold text-slate-400">
-                  {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {(Array.isArray(group?.items) ? group.items : []).map((item) => (
-                  <CustomerMenuCard
-                    key={item._id}
-                    item={item}
-                    quantity={getItemQuantity(item._id)}
-                    onAdd={() => addToCart(item, 1)}
-                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                    onOpenModal={() => setSelectedItem(item)}
-                  />
-                ))}
-              </div>
-            </section>
-          ))
+              Refresh Menu
+            </button>
+          </div>
         ) : (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
-              <h3 className="font-extrabold text-slate-900 text-sm">
-                {searchQuery ? `Search Results ("${searchQuery}")` : 'Menu Items'}
-              </h3>
-              <span className="text-[11px] font-bold text-slate-400">
-                {filteredItems.length} items
-              </span>
-            </div>
+          <>
+            {/* Popular / Recommended Items */}
+            {activeCategory === 'ALL' && !searchQuery.trim() && popularItems.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <FiStar className="w-4 h-4 text-amber-500 fill-amber-500" />
+                  <h2 className="font-extrabold text-slate-900 text-sm">Chef's Recommendations</h2>
+                </div>
 
-            {filteredItems.length === 0 ? (
-              <div className="py-16 text-center">
-                <p className="text-slate-400 text-xs">No matching dishes found.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3">
-                {(Array.isArray(filteredItems) ? filteredItems : []).map((item) => (
-                  <CustomerMenuCard
-                    key={item._id}
-                    item={item}
-                    quantity={getItemQuantity(item._id)}
-                    onAdd={() => addToCart(item, 1)}
-                    onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                    onOpenModal={() => setSelectedItem(item)}
-                  />
-                ))}
-              </div>
+                <div className="flex gap-3 overflow-x-auto pb-3 pt-1 -mx-4 px-4 scrollbar-none no-scrollbar snap-x snap-mandatory">
+                  {(Array.isArray(popularItems) ? popularItems : []).map((item) => (
+                    <div key={item._id} className="w-[285px] sm:w-[305px] shrink-0 snap-start">
+                      <CustomerMenuCard
+                        item={item}
+                        quantity={getItemQuantity(item._id)}
+                        onAdd={() => addToCart(item, 1)}
+                        onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                        onOpenModal={() => setSelectedItem(item)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </section>
             )}
-          </section>
+
+            {/* Grouped Section or Filtered Flat List */}
+            {groupedItems ? (
+              groupedItems.map(([catId, group]) => (
+                <section
+                  key={catId}
+                  ref={(el) => (categorySectionRefs.current[catId] = el)}
+                  className="space-y-3 pt-2"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+                    <h3 className="font-extrabold text-slate-900 text-sm">{group.categoryName}</h3>
+                    <span className="text-[11px] font-bold text-slate-400">
+                      {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {(Array.isArray(group?.items) ? group.items : []).map((item) => (
+                      <CustomerMenuCard
+                        key={item._id}
+                        item={item}
+                        quantity={getItemQuantity(item._id)}
+                        onAdd={() => addToCart(item, 1)}
+                        onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                        onOpenModal={() => setSelectedItem(item)}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))
+            ) : (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200/80 pb-1.5">
+                  <h3 className="font-extrabold text-slate-900 text-sm">
+                    {searchQuery ? `Search Results ("${searchQuery}")` : 'Menu Items'}
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-400">
+                    {filteredItems.length} items
+                  </span>
+                </div>
+
+                {filteredItems.length === 0 ? (
+                  <div className="py-16 text-center">
+                    <p className="text-slate-400 text-xs">No matching dishes found.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {(Array.isArray(filteredItems) ? filteredItems : []).map((item) => (
+                      <CustomerMenuCard
+                        key={item._id}
+                        item={item}
+                        quantity={getItemQuantity(item._id)}
+                        onAdd={() => addToCart(item, 1)}
+                        onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
+                        onOpenModal={() => setSelectedItem(item)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
+          </>
         )}
       </main>
 

@@ -23,6 +23,11 @@ export const createCategory = asyncHandler(async (req, res) => {
     restaurantId: req.restaurantId,
     data: { action: 'create', category },
   });
+  emitSyncEvent({
+    event: SOCKET_EVENTS.MENU_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'category_created', category },
+  });
   return sendSuccess(res, 'Category created successfully.', category, HTTP_STATUS.CREATED, { data: category });
 });
 
@@ -32,6 +37,11 @@ export const updateCategory = asyncHandler(async (req, res) => {
     event: SOCKET_EVENTS.CATEGORY_UPDATED,
     restaurantId: req.restaurantId,
     data: { action: 'update', category },
+  });
+  emitSyncEvent({
+    event: SOCKET_EVENTS.MENU_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'category_updated', category },
   });
   return sendSuccess(res, 'Category updated successfully.', category, HTTP_STATUS.OK, { data: category });
 });
@@ -43,6 +53,11 @@ export const deleteCategory = asyncHandler(async (req, res) => {
     restaurantId: req.restaurantId,
     data: { action: 'delete', categoryId: req.params.id },
   });
+  emitSyncEvent({
+    event: SOCKET_EVENTS.MENU_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'category_deleted', categoryId: req.params.id },
+  });
   return sendSuccess(res, result.message, result, HTTP_STATUS.OK);
 });
 
@@ -52,6 +67,11 @@ export const toggleCategoryStatus = asyncHandler(async (req, res) => {
     event: SOCKET_EVENTS.CATEGORY_UPDATED,
     restaurantId: req.restaurantId,
     data: { action: 'toggle_status', category },
+  });
+  emitSyncEvent({
+    event: SOCKET_EVENTS.MENU_UPDATED,
+    restaurantId: req.restaurantId,
+    data: { action: 'category_status_toggled', category },
   });
   return sendSuccess(
     res,

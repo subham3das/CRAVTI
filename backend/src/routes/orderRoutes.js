@@ -26,6 +26,7 @@ const router = Router();
 // ==========================================
 router.get('/menu/:restaurantSlug/:tableId/:qrToken', getCustomerMenu);
 router.get('/menu/:restaurantSlug/:tableId', getCustomerMenu);
+router.get('/menu/:restaurantSlug', getCustomerMenu);
 router.get('/active-session/:restaurantSlug/:tableId', getActiveCustomerOrder);
 router.post('/place', placeOrder);
 router.get('/track/:id', getOrderById);

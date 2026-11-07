@@ -84,6 +84,55 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
     return item ? safeNumber(item.quantity) : 0;
   };
 
+  /**
+   * Reconciles cart items against latest live production menu items
+   * Removes deleted/out-of-stock items, updates live prices and images
+   */
+  const syncCartWithLiveMenu = (liveMenuItems = []) => {
+    if (!Array.isArray(liveMenuItems) || liveMenuItems.length === 0) return;
+    const liveMap = new Map(liveMenuItems.map((item) => [String(item._id), item]));
+
+    setCart((prevCart) => {
+      let changed = false;
+      const updatedCart = [];
+
+      for (const cartItem of prevCart) {
+        const liveItem = liveMap.get(String(cartItem.menuItemId));
+        // Remove item if no longer in live menu, deleted, or out of stock
+        if (!liveItem || liveItem.isDeleted || liveItem.availability === 'out_of_stock') {
+          changed = true;
+          continue;
+        }
+
+        const currentPrice = safeNumber(liveItem.price);
+        const currentSellingPrice = safeNumber(liveItem.sellingPrice) || currentPrice;
+        const currentName = liveItem.itemName || cartItem.name;
+        const currentImage = liveItem.image?.url || cartItem.image;
+
+        if (
+          cartItem.price !== currentPrice ||
+          cartItem.sellingPrice !== currentSellingPrice ||
+          cartItem.name !== currentName ||
+          cartItem.image !== currentImage
+        ) {
+          changed = true;
+          updatedCart.push({
+            ...cartItem,
+            name: currentName,
+            itemName: currentName,
+            price: currentPrice,
+            sellingPrice: currentSellingPrice,
+            image: currentImage,
+          });
+        } else {
+          updatedCart.push(cartItem);
+        }
+      }
+
+      return changed ? updatedCart : prevCart;
+    });
+  };
+
   const safeCart = Array.isArray(cart) ? cart : [];
   const totalCount = safeCart.reduce((sum, item) => sum + safeNumber(item.quantity), 0);
 
@@ -108,6 +157,7 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
         removeFromCart,
         clearCart,
         getItemQuantity,
+        syncCartWithLiveMenu,
         totalCount,
         subtotal,
         discount,
