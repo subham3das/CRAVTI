@@ -694,3 +694,4 @@ export const getRestaurantAnalyticsService = async (restaurantId, query = {}) =>
     })),
   };
 };
+

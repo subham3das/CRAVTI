@@ -13,6 +13,7 @@ import dashboardRoutes from './dashboardRoutes.js';
 import paymentRoutes from './paymentRoutes.js';
 import healthRoutes from './healthRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
+import restaurantPaymentRoutes from './restaurantPaymentRoutes.js';
 import {
   getPlatformRevenueStats,
   getPlatformSubscriptions,
@@ -29,6 +30,8 @@ router.use('/', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/restaurant/payments', restaurantPaymentRoutes);
+router.use('/restaurant/settlements', restaurantPaymentRoutes);
 router.use('/payment', paymentRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/restaurants', restaurantRoutes);

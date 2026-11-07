@@ -10,8 +10,20 @@ import {
   testGatewayConnection,
   getAdminPayments,
 } from '../controllers/paymentController.js';
+import {
+  getRestaurantPaymentsSummary,
+  getRestaurantPaymentsList,
+  getRestaurantRevenueChart,
+  getRestaurantPaymentMethods,
+  getRestaurantSettlementsHistory,
+  getRestaurantRefunds,
+  getRestaurantFailedPayments,
+  getRestaurantBankDetails,
+  exportRestaurantPaymentsCSV,
+} from '../controllers/restaurantPaymentController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { adminProtect } from '../middleware/adminAuthMiddleware.js';
+import { requireRestaurant } from '../middleware/tenantMiddleware.js';
 import env from '../config/env.js';
 
 const router = Router();
@@ -28,6 +40,15 @@ router.post('/webhook', handlePaymentWebhook);
 // ==========================================
 router.get('/gateway-status', protect, getGatewayStatus);
 router.post('/test-connection', protect, testGatewayConnection);
+router.get('/summary', protect, requireRestaurant, getRestaurantPaymentsSummary);
+router.get('/chart', protect, requireRestaurant, getRestaurantRevenueChart);
+router.get('/methods', protect, requireRestaurant, getRestaurantPaymentMethods);
+router.get('/settlements', protect, requireRestaurant, getRestaurantSettlementsHistory);
+router.get('/settlements/history', protect, requireRestaurant, getRestaurantSettlementsHistory);
+router.get('/refunds', protect, requireRestaurant, getRestaurantRefunds);
+router.get('/failed', protect, requireRestaurant, getRestaurantFailedPayments);
+router.get('/bank-details', protect, requireRestaurant, getRestaurantBankDetails);
+router.get('/export', protect, requireRestaurant, exportRestaurantPaymentsCSV);
 
 // ==========================================
 // Admin Control Center Routes
@@ -48,7 +69,11 @@ router.get('/', (req, res, next) => {
       }
     } catch (_) {}
   }
-  return getAdminPayments(req, res, next);
+  // Otherwise, route as restaurant authenticated request
+  return protect(req, res, (err) => {
+    if (err) return next(err);
+    requireRestaurant(req, res, () => getRestaurantPaymentsList(req, res, next));
+  });
 });
 
 // Single Payment Inspection (Restaurant or Admin)
