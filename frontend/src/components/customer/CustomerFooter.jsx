@@ -3,13 +3,13 @@ import logoSvg from '../../assets/logo.svg';
 import env from '../../config/env';
 
 export const CustomerFooter = ({ compact = false, className = '' }) => {
-  // Construct website base URL from environment variable (Never hardcoded)
+  // Construct website base URL from environment variable with live public website fallback
   const rawBaseUrl =
     (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_WEBSITE_URL) ||
     env?.WEBSITE_URL ||
     env?.PUBLIC_WEBSITE_URL ||
     import.meta.env?.VITE_PUBLIC_WEBSITE_URL ||
-    'https://craviti.com';
+    'https://cravti-rsvm.vercel.app';
 
   const baseUrl = String(rawBaseUrl).replace(/\/+$/, '');
 
