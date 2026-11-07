@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { constructMetadata } from '../../lib/seo';
 import { SectionHeader } from '../../components/SectionHeader';
 import { Badge } from '../../components/Badge';
@@ -51,7 +52,7 @@ const LEADERSHIP = [
     name: 'Subham Das',
     role: 'Founder & CEO',
     bio: 'Founder and Chief Executive Officer of Craviti, dedicated to empowering restaurants with contactless QR ordering, live kitchen synchronization, and next-generation hospitality technology.',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    avatar: '/founder.png',
   },
 ];
 
@@ -158,11 +159,14 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 max-w-md mx-auto gap-8">
             {LEADERSHIP.map((lead, i) => (
               <Card key={i} className="p-6 bg-slate-50/50 space-y-4 text-center">
-                <div className="w-24 h-24 rounded-full mx-auto overflow-hidden border-2 border-[#FFD5C5] shadow-soft">
-                  <img
+                <div className="w-24 h-24 rounded-full mx-auto overflow-hidden border-2 border-[#FFD5C5] shadow-soft relative">
+                  <Image
                     src={lead.avatar}
-                    alt={lead.name}
+                    alt={`${lead.name} - ${lead.role}`}
+                    width={96}
+                    height={96}
                     className="w-full h-full object-cover"
+                    priority
                   />
                 </div>
                 <div>
