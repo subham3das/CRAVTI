@@ -52,10 +52,10 @@ export const CustomerCartDrawer = ({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="relative bg-white w-full max-w-md rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] z-10"
+          className="relative bg-white w-full max-w-md rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] z-10 overflow-hidden"
         >
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#16A34A] flex items-center justify-center font-bold text-xs">
                 T{tableNumber}
@@ -185,77 +185,85 @@ export const CustomerCartDrawer = ({
                 </div>
               </div>
 
-              {/* Payment Mode Selector */}
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-white space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Payment Mode
-                </p>
+              {/* Craviti Customer Ordering Footer (In scrollable section) */}
+              <CustomerFooter compact className="bg-slate-50/70 border border-slate-100 rounded-xl" />
+            </div>
+          )}
+
+          {/* Sticky Checkout Bottom Section (Payment Method + Bill Summary + Place Order CTA) */}
+          {cart.length > 0 && (
+            <div
+              className="shrink-0 bg-white border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] p-4 space-y-3 z-20"
+              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+            >
+              {/* Payment Method Selector */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Payment Method
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-medium">Select how to pay</span>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('cash')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center justify-center ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       paymentMethod === 'cash'
-                        ? 'border-[#16A34A] bg-emerald-50/50 text-[#16A34A]'
+                        ? 'border-[#16A34A] bg-emerald-50 text-[#16A34A] ring-1 ring-[#16A34A]/30 shadow-2xs'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>💵 Pay Cash</span>
-                    <span className="text-[10px] font-normal text-slate-400 mt-0.5">Pay at Counter</span>
+                    <span>💵</span>
+                    <span className="truncate">Pay Cash</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setPaymentMethod('online')}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center justify-center ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
                       paymentMethod === 'online'
-                        ? 'border-[#16A34A] bg-emerald-50/50 text-[#16A34A]'
+                        ? 'border-[#16A34A] bg-emerald-50 text-[#16A34A] ring-1 ring-[#16A34A]/30 shadow-2xs'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>💳 Pay Online</span>
-                    <span className="text-[10px] font-normal text-slate-400 mt-0.5">Instant Checkout</span>
+                    <span>💳</span>
+                    <span className="truncate">Pay Online</span>
                   </button>
                 </div>
               </div>
 
-              {/* Bill Details */}
-              <div className="p-3.5 rounded-xl border border-slate-100 bg-white space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Bill Summary
-                </p>
-
-                <div className="flex justify-between text-xs text-slate-600">
+              {/* Bill Summary */}
+              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-600">
                   <span>Item Total</span>
-                  <span>{formatCurrency(subtotal)}</span>
+                  <span className="font-medium text-slate-800">{formatCurrency(subtotal)}</span>
                 </div>
 
                 {discount > 0 && (
-                  <div className="flex justify-between text-xs font-medium text-emerald-600">
-                    <span>Menu Discounts</span>
+                  <div className="flex items-center justify-between text-xs font-medium text-emerald-600">
+                    <span>Menu Discount</span>
                     <span>- {formatCurrency(discount)}</span>
                   </div>
                 )}
 
-                <div className="border-t border-slate-100 pt-2 flex justify-between text-sm font-extrabold text-slate-900">
-                  <span>Grand Total</span>
-                  <span className="text-base text-[#16A34A]">{formatCurrency(grandTotal)}</span>
+                <div className="pt-1.5 border-t border-slate-100 flex items-baseline justify-between text-slate-900">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    Grand Total
+                  </span>
+                  <span className="text-base font-black text-[#16A34A]">
+                    {formatCurrency(grandTotal)}
+                  </span>
                 </div>
               </div>
 
-              {/* Craviti Customer Ordering Footer */}
-              <CustomerFooter compact className="bg-slate-50 border border-slate-100" />
-            </div>
-          )}
-
-          {/* Place Order CTA Button */}
-          {cart.length > 0 && (
-            <div className="p-4 border-t border-slate-100 bg-white">
+              {/* Place Order CTA Button */}
               <button
                 type="button"
                 disabled={isPlacingOrder}
                 onClick={handlePlaceOrderSubmit}
-                className="w-full py-3.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-between active:scale-[0.98] transition-all disabled:opacity-70"
+                className="w-full py-3.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-sm shadow-lg shadow-emerald-500/20 flex items-center justify-between active:scale-[0.98] transition-all disabled:opacity-70 cursor-pointer"
               >
                 <div className="text-left">
                   <p className="text-[10px] uppercase tracking-wider text-emerald-100 font-medium">
