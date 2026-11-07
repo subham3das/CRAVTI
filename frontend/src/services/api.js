@@ -11,6 +11,38 @@ const api = axios.create({
   withCredentials: true,
 });
 
+/**
+ * Safely inspect JWT expiration without throwing
+ */
+const isTokenExpired = (token) => {
+  if (!token || typeof token !== 'string') return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const payload = JSON.parse(atob(parts[1]));
+    if (!payload.exp) return false;
+    // Check if token expiration (with 10-second buffer) is in the past
+    return Date.now() >= (payload.exp - 10) * 1000;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Helper to identify public customer ordering routes
+ * Never strips tokens from restaurant admin endpoints (/menu, /orders, /categories, etc.)
+ */
+const isPublicCustomerRoute = (url, pathname = '') => {
+  if (typeof pathname === 'string' && pathname.startsWith('/order/')) {
+    return true;
+  }
+  if (typeof url === 'string') {
+    // Only customer ordering API endpoints start with /order/ (singular)
+    if (url.startsWith('/order/')) return true;
+  }
+  return false;
+};
+
 api.interceptors.request.use(
   (config) => {
     // When sending FormData, allow browser to automatically generate multipart boundary
@@ -18,21 +50,17 @@ api.interceptors.request.use(
       delete config.headers['Content-Type'];
     }
 
-    // STRICT TOKEN ISOLATION:
-    // Customer ordering routes MUST NEVER send restaurant or admin tokens
-    const isPublicCustomerRoute =
-      config.url?.includes('/menu/') ||
-      config.url?.includes('/order/menu') ||
-      config.url?.includes('/customer') ||
-      config.url?.startsWith('/orders/menu') ||
-      window.location.pathname.startsWith('/order/');
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const isPublicCustomer = isPublicCustomerRoute(config.url, currentPath);
 
-    if (isPublicCustomerRoute) {
+    // STRICT TOKEN ISOLATION:
+    // Only customer ordering routes omit authentication headers
+    if (isPublicCustomer) {
       delete config.headers.Authorization;
       return config;
     }
 
-    // Restaurant requests ONLY use restaurantAccessToken
+    // Restaurant requests MUST use restaurantAccessToken (or craviti_token fallback)
     const token =
       localStorage.getItem('restaurantAccessToken') ||
       localStorage.getItem('craviti_token');
@@ -42,6 +70,18 @@ api.interceptors.request.use(
     } else {
       delete config.headers.Authorization;
     }
+
+    // Diagnostic logging for development & troubleshooting
+    if (import.meta.env?.DEV || (typeof window !== 'undefined' && window.__CRAVITI_DEBUG__)) {
+      console.debug('[Restaurant API Request]', {
+        url: config.url,
+        method: config.method,
+        hasToken: !!token,
+        authAttached: !!config.headers.Authorization,
+        storageKey: token ? 'restaurantAccessToken' : 'none',
+      });
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -50,7 +90,7 @@ api.interceptors.request.use(
 // Global Axios Error Handling (Standard 13)
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     if (!error.response) {
       // Network failure
       toast.error('Network error. Connecting to Craviti production server...');
@@ -59,20 +99,57 @@ api.interceptors.response.use(
 
     const { status, data } = error.response;
     const serverMessage = data?.message || data?.error || '';
-    const currentPath = window.location.pathname;
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    const originalRequest = error.config;
 
     switch (status) {
-      case 401:
-        // Unauthorized
-        if (currentPath !== '/login' && currentPath !== '/signup' && !currentPath.startsWith('/order/')) {
+      case 401: {
+        const currentToken =
+          localStorage.getItem('restaurantAccessToken') ||
+          localStorage.getItem('craviti_token');
+
+        console.warn('[Restaurant API 401 Unauthorized]', {
+          url: originalRequest?.url,
+          currentPath,
+          hasToken: !!currentToken,
+          tokenExpired: isTokenExpired(currentToken),
+          isRetry: !!originalRequest?._retry,
+          serverMessage,
+        });
+
+        // 1. Never logout or redirect on public customer routes or public auth pages
+        if (currentPath === '/login' || currentPath === '/signup' || currentPath.startsWith('/order/')) {
+          break;
+        }
+
+        // 2. Defensive Retry: If request hasn't been retried yet, and we have a valid, unexpired token,
+        // re-attach the Authorization header and retry once instead of immediately logging out.
+        if (originalRequest && !originalRequest._retry && currentToken && !isTokenExpired(currentToken)) {
+          originalRequest._retry = true;
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${currentToken}`;
+          console.info('[Restaurant API] Retrying request once with active token...', originalRequest.url);
+          return api(originalRequest);
+        }
+
+        // 3. Genuine Session Expiration: Only logout if retry also failed or token is genuinely missing / expired
+        if (originalRequest?._retry || !currentToken || isTokenExpired(currentToken)) {
+          console.error('[Restaurant Auth] Genuine session expiration detected. Logging out.', {
+            triggerSource: 'Axios 401 Interceptor',
+            url: originalRequest?.url,
+            storageKey: currentToken ? 'restaurantAccessToken (expired/rejected)' : 'none',
+          });
+
           localStorage.removeItem('restaurantAccessToken');
           localStorage.removeItem('restaurantRefreshToken');
           localStorage.removeItem('craviti_token');
           localStorage.removeItem('craviti_user');
+
           toast.error('Session expired. Please log in again.');
           window.location.href = '/login';
         }
         break;
+      }
 
       case 403:
         // Forbidden

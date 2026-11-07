@@ -30,11 +30,15 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (err) {
       console.warn('Session verification failed:', err.message);
-      localStorage.removeItem('restaurantAccessToken');
-      localStorage.removeItem('restaurantRefreshToken');
-      localStorage.removeItem('craviti_token');
-      setUser(null);
-      setRestaurant(null);
+      // ONLY clear storage if server explicitly rejected authentication (401)
+      // Network errors, cold-start delays, or 500s must never wipe user session
+      if (err.response?.status === 401) {
+        localStorage.removeItem('restaurantAccessToken');
+        localStorage.removeItem('restaurantRefreshToken');
+        localStorage.removeItem('craviti_token');
+        setUser(null);
+        setRestaurant(null);
+      }
     } finally {
       setLoading(false);
     }
