@@ -23,6 +23,7 @@ import { CustomerMenuCard } from '../components/customer/CustomerMenuCard';
 import { CustomerItemModal } from '../components/customer/CustomerItemModal';
 import { CustomerCartDrawer } from '../components/customer/CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from '../components/customer/CustomerOrderSuccessModal';
+import { CustomerFooter } from '../components/customer/CustomerFooter';
 import { ImageWithFallback } from '../components/ImageWithFallback';
 import { getOrCreateGuestId, getOrCreateDeviceId, getOrCreateSessionId, setGuestId } from '../utils/guestSession';
 import { formatCurrency } from '../utils/formatters';
@@ -642,6 +643,9 @@ const CustomerMenuContent = () => {
           </section>
         )}
       </main>
+
+      {/* Craviti Customer Ordering Footer */}
+      <CustomerFooter className="mb-24 sm:mb-12" />
 
       {/* Floating Cart Pill (Bottom Bar) */}
       <AnimatePresence>

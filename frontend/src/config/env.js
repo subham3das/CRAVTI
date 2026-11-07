@@ -18,9 +18,18 @@ const rawSocketUrl =
   import.meta.env.VITE_BACKEND_URL ||
   (rawApiUrl ? rawApiUrl.replace(/\/api.*$/, '') : 'https://cravti.onrender.com');
 
+const rawWebsiteUrl =
+  (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_WEBSITE_URL) ||
+  import.meta.env.VITE_PUBLIC_WEBSITE_URL ||
+  import.meta.env.NEXT_PUBLIC_WEBSITE_URL ||
+  import.meta.env.VITE_WEBSITE_URL ||
+  'https://craviti.com';
+
 export const env = Object.freeze({
   API_BASE_URL: normalizeUrl(rawApiUrl, 'https://cravti.onrender.com/api'),
   SOCKET_URL: normalizeUrl(rawSocketUrl, 'https://cravti.onrender.com'),
+  WEBSITE_URL: normalizeUrl(rawWebsiteUrl, 'https://craviti.com'),
+  PUBLIC_WEBSITE_URL: normalizeUrl(rawWebsiteUrl, 'https://craviti.com'),
   APP_NAME: import.meta.env.VITE_APP_NAME || 'Craviti',
   APP_ENV: import.meta.env.VITE_APP_ENV || import.meta.env.MODE || 'production',
   IS_PRODUCTION: import.meta.env.PROD || import.meta.env.VITE_APP_ENV === 'production',

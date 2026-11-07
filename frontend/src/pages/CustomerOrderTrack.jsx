@@ -17,6 +17,7 @@ import { createPaymentOrderApi, verifyPaymentApi } from '../services/paymentServ
 import { openRazorpayModal } from '../utils/razorpay';
 import { generateReceiptPdf, RECEIPT_TEMPLATES } from '../utils/receiptGenerator';
 import { CustomerVegBadge } from '../components/customer/CustomerVegBadge';
+import { CustomerFooter } from '../components/customer/CustomerFooter';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
 import env from '../config/env.js';
@@ -447,6 +448,9 @@ export const CustomerOrderTrack = () => {
             <span>Back to Menu / Order More</span>
           </button>
         )}
+
+        {/* Craviti Customer Ordering Footer */}
+        <CustomerFooter className="mt-8 rounded-2xl" />
       </div>
     </div>
   );

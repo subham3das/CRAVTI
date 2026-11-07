@@ -14,3 +14,4 @@ export default function ShippingPolicyPage() {
   if (!doc) notFound();
   return <LegalLayout document={doc} />;
 }
+

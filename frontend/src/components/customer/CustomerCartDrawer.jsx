@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag, FiArrowRight, FiUser, FiPhone, FiDollarSign, FiCreditCard } from 'react-icons/fi';
 import { CustomerVegBadge } from './CustomerVegBadge';
+import { CustomerFooter } from './CustomerFooter';
 import { formatCurrency } from '../../utils/formatters';
 
 export const CustomerCartDrawer = ({
@@ -90,6 +91,7 @@ export const CustomerCartDrawer = ({
               >
                 Browse Menu
               </button>
+              <CustomerFooter compact className="w-full mt-6 bg-transparent border-0 px-0" />
             </div>
           ) : (
             <div className="overflow-y-auto flex-1 p-4 space-y-4">
@@ -240,6 +242,9 @@ export const CustomerCartDrawer = ({
                   <span className="text-base text-[#16A34A]">{formatCurrency(grandTotal)}</span>
                 </div>
               </div>
+
+              {/* Craviti Customer Ordering Footer */}
+              <CustomerFooter compact className="bg-slate-50 border border-slate-100" />
             </div>
           )}
 

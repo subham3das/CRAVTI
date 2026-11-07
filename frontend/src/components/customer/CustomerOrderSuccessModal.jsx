@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiCheckCircle, FiClock, FiArrowRight, FiRotateCcw } from 'react-icons/fi';
 import { MdQrCodeScanner } from 'react-icons/md';
+import { CustomerFooter } from './CustomerFooter';
 
 export const CustomerOrderSuccessModal = ({
   order,
@@ -101,6 +102,9 @@ export const CustomerOrderSuccessModal = ({
               <span>Back to Menu</span>
             </button>
           </div>
+
+          {/* Craviti Customer Ordering Footer */}
+          <CustomerFooter compact className="mt-4 bg-slate-50 border border-slate-100" />
         </motion.div>
       </div>
     </AnimatePresence>
