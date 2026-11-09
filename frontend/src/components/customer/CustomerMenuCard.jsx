@@ -45,7 +45,7 @@ export const CustomerMenuCard = React.memo(({
       whileTap={{ scale: 0.985 }}
       whileHover={{ y: -1.5 }}
       transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-      className={`bg-white rounded-2xl p-3.5 border border-slate-100 shadow-sm hover:border-slate-200 transition-all cursor-pointer flex gap-3 relative overflow-hidden select-none ${
+      className={`w-full bg-white rounded-xl p-3.5 sm:p-4 border border-slate-100 shadow-sm hover:border-slate-200 transition-all cursor-pointer flex gap-3 sm:gap-4 relative overflow-hidden select-none ${
         isOutOfStock ? 'opacity-60 grayscale-[40%]' : ''
       }`}
     >
@@ -53,7 +53,7 @@ export const CustomerMenuCard = React.memo(({
       <div className="flex-1 flex flex-col justify-between min-w-0 pr-1">
         <div>
           {/* Top Row: Type & Badges */}
-          <div className="flex items-center gap-1.5 mb-1.5 flex-nowrap overflow-hidden">
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
             <CustomerVegBadge type={item?.foodType} />
 
             {isPopular && (
@@ -69,9 +69,9 @@ export const CustomerMenuCard = React.memo(({
             )}
           </div>
 
-          {/* Item Name - Displays Full Name with 2-line headroom */}
+          {/* Item Name - Displays Full Name without truncation */}
           <h3
-            className="font-extrabold text-sm text-slate-900 leading-snug line-clamp-2 break-words"
+            className="font-extrabold text-sm sm:text-base text-slate-900 leading-snug break-words"
             title={item?.itemName}
           >
             {item?.itemName ?? 'Dish'}
@@ -88,7 +88,7 @@ export const CustomerMenuCard = React.memo(({
         {/* Bottom Row: Price & Prep Time */}
         <div className="mt-3 flex items-center justify-between gap-2">
           <div className="flex items-baseline gap-1.5">
-            <span className="font-extrabold text-sm text-slate-900">
+            <span className="font-extrabold text-sm sm:text-base text-slate-900">
               {formatCurrency(item?.sellingPrice || item?.price || 0)}
             </span>
 
@@ -108,13 +108,13 @@ export const CustomerMenuCard = React.memo(({
       </div>
 
       {/* Right: Image & Add Stepper */}
-      <div className="w-22 sm:w-24 shrink-0 flex flex-col justify-between items-center">
-        <div className="w-22 h-22 sm:w-24 sm:h-24 rounded-2xl overflow-hidden relative bg-slate-50 border border-slate-100 shadow-2xs">
+      <div className="w-24 sm:w-28 shrink-0 flex flex-col justify-between items-center">
+        <div className="w-full aspect-[4/3] rounded-lg overflow-hidden relative bg-slate-50 border border-slate-100 shadow-2xs">
           <ImageWithFallback
             src={item?.image?.url}
             alt={item?.itemName}
             type="menu"
-            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+            className="w-full h-full object-cover rounded-lg transition-transform duration-300 hover:scale-105"
           />
 
           {isOutOfStock && (

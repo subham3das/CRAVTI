@@ -105,7 +105,7 @@ export const CustomerCartDrawer = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-1">
                         <CustomerVegBadge type={item.foodType} />
-                        <h4 className="font-bold text-xs text-slate-900 truncate">
+                        <h4 className="font-bold text-xs text-slate-900 break-words leading-tight">
                           {item.itemName}
                         </h4>
                       </div>

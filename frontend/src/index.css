@@ -3,8 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-surface-bg text-content antialiased font-sans;
+  html, body {
+    @apply bg-surface-bg text-content antialiased font-sans overflow-x-hidden;
+    max-width: 100vw;
   }
 }
 

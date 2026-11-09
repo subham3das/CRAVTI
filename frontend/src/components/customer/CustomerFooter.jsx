@@ -46,7 +46,7 @@ export const CustomerFooter = ({ compact = false, className = '' }) => {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-400 hover:text-[#16A34A] transition-colors"
+                className="text-slate-400 hover:text-[#16A34A] transition-colors whitespace-nowrap"
               >
                 {link.label}
               </a>
@@ -89,7 +89,7 @@ export const CustomerFooter = ({ compact = false, className = '' }) => {
 
         {/* Legal Links with Clean Dot Dividers */}
         <nav
-          className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-xs font-medium pt-1 px-2"
+          className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-xs font-medium pt-1 px-4 max-w-lg mx-auto"
           aria-label="Legal Documents"
         >
           {legalLinks.map((link, idx) => (
@@ -98,12 +98,12 @@ export const CustomerFooter = ({ compact = false, className = '' }) => {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-slate-500 hover:text-[#16A34A] hover:underline underline-offset-2 transition-colors py-0.5 focus:outline-hidden focus:ring-2 focus:ring-[#16A34A]/40 rounded-sm"
+                className="text-slate-500 hover:text-[#16A34A] hover:underline underline-offset-2 transition-colors py-0.5 whitespace-nowrap focus:outline-hidden focus:ring-2 focus:ring-[#16A34A]/40 rounded-sm"
               >
                 {link.label}
               </a>
               {idx < legalLinks.length - 1 && (
-                <span className="text-slate-300 select-none">•</span>
+                <span className="text-slate-300 select-none hidden xs:inline sm:inline">•</span>
               )}
             </React.Fragment>
           ))}
