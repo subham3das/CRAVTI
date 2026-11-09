@@ -19,11 +19,24 @@ import { sendSuccess } from '../utils/apiResponse.js';
 import { HTTP_STATUS } from '../constants/index.js';
 
 export const getCustomerMenu = asyncHandler(async (req, res) => {
-  const { restaurantSlug, tableId, qrToken: paramToken } = req.params;
-  const { guestId, deviceId, token, qrToken: queryToken } = req.query;
+  const { restaurantSlug, tableId, tableNumber, qrToken: paramToken } = req.params;
+  const { guestId, deviceId, token, qrToken: queryToken, table: queryTable } = req.query;
+  const resolvedTable = tableId || tableNumber || queryTable || '';
   const resolvedToken = paramToken || token || queryToken || '';
-  const data = await getCustomerMenuService(restaurantSlug, tableId, guestId, deviceId, resolvedToken);
-  return sendSuccess(res, 'Menu loaded successfully', data, HTTP_STATUS.OK, { data });
+  const data = await getCustomerMenuService(restaurantSlug, resolvedTable, guestId, deviceId, resolvedToken);
+
+  const message =
+    !data.menuItems || data.menuItems.length === 0
+      ? 'Menu is currently unavailable.'
+      : 'Menu loaded successfully';
+
+  return sendSuccess(res, message, data, HTTP_STATUS.OK, {
+    restaurant: data.restaurant,
+    table: data.table,
+    categories: data.categories || [],
+    items: data.menuItems || [],
+    menuItems: data.menuItems || [],
+  });
 });
 
 export const getActiveCustomerOrder = asyncHandler(async (req, res) => {

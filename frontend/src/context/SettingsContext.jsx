@@ -14,6 +14,8 @@ export const SettingsProvider = ({ children }) => {
 
   // Load settings once when restaurant is authenticated
   const reloadSettings = useCallback(async () => {
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    if (currentPath.startsWith('/order/')) return;
     if (!restaurant?._id) return;
     try {
       setLoading(true);

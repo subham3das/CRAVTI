@@ -9,6 +9,8 @@ const normalizeUrl = (url, fallback) => {
 };
 
 const rawApiUrl =
+  (typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_API_URL || process.env?.VITE_API_BASE_URL)) ||
+  import.meta.env.NEXT_PUBLIC_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
   import.meta.env.VITE_API_URL ||
   'https://cravti.onrender.com/api';

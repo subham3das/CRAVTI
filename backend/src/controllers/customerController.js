@@ -14,13 +14,14 @@ import { HTTP_STATUS } from '../constants/index.js';
  * Dynamic customer menu single source of truth
  */
 export const getCustomerMenu = asyncHandler(async (req, res) => {
-  const { restaurantSlug: paramSlug, tableId } = req.params;
+  const { restaurantSlug: paramSlug, tableId, tableNumber } = req.params;
   const {
     restaurantSlug: querySlug,
     slug,
     restaurantId,
     tableIdentifier,
     tableId: queryTableId,
+    table: queryTable,
     guestId,
     deviceId,
     token,
@@ -28,11 +29,22 @@ export const getCustomerMenu = asyncHandler(async (req, res) => {
   } = req.query;
 
   const resolvedSlug = paramSlug || querySlug || slug || restaurantId || '';
-  const resolvedTable = tableId || tableIdentifier || queryTableId || '';
+  const resolvedTable = tableId || tableNumber || tableIdentifier || queryTableId || queryTable || '';
   const resolvedToken = token || queryQrToken || '';
 
   const data = await getCustomerMenuService(resolvedSlug, resolvedTable, guestId, deviceId, resolvedToken);
-  return sendSuccess(res, 'Customer menu fetched successfully', data, HTTP_STATUS.OK, { data });
+  const message =
+    !data.menuItems || data.menuItems.length === 0
+      ? 'Menu is currently unavailable.'
+      : 'Customer menu fetched successfully';
+
+  return sendSuccess(res, message, data, HTTP_STATUS.OK, {
+    restaurant: data.restaurant,
+    table: data.table,
+    categories: data.categories || [],
+    items: data.menuItems || [],
+    menuItems: data.menuItems || [],
+  });
 });
 
 /**
@@ -169,3 +181,4 @@ export const getCustomerMenuItems = asyncHandler(async (req, res) => {
 
   return sendSuccess(res, 'Menu items fetched successfully', items, HTTP_STATUS.OK, { data: items });
 });
+

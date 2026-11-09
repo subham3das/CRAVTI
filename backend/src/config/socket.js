@@ -9,8 +9,8 @@ const isOriginAllowed = (origin) => {
   if (/^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)) {
     return true;
   }
-  // Allow all Craviti Vercel production & preview domains
-  if (/^https:\/\/(cravti|craviti)[a-zA-Z0-9\-_.]*\.vercel\.app$/.test(origin)) {
+  // Allow ALL Craviti Vercel production & preview domains (*.vercel.app)
+  if (/^https:\/\/[a-zA-Z0-9\-_.]+\.vercel\.app$/.test(origin)) {
     return true;
   }
   // Allow configured origins

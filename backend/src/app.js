@@ -32,6 +32,13 @@ const staticOrigins = [
   env.ADMIN_CLIENT_URL,
   env.FRONTEND_URL,
   env.ADMIN_URL,
+  env.WEBSITE_URL,
+  env.PUBLIC_WEBSITE_URL,
+  'https://cravti.vercel.app',
+  'https://cravti-rsvm.vercel.app',
+  'https://craviti.vercel.app',
+  'https://craviti.com',
+  'https://www.craviti.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175',
@@ -45,9 +52,12 @@ const isAllowedOrigin = (origin) => {
   if (staticOrigins.includes(origin)) return true;
   // Allow all localhost and 127.0.0.1 ports (for dev & admin panels)
   if (/^http:\/\/(localhost|127\.0\.0\.1):[0-9]+$/.test(origin)) return true;
-  // Allow all Craviti Vercel production & preview domains
-  if (/^https:\/\/(cravti|craviti)[a-zA-Z0-9\-_.]*\.vercel\.app$/.test(origin)) return true;
-  return false;
+  // Allow ALL Vercel production & preview deployments (*.vercel.app)
+  if (/^https:\/\/[a-zA-Z0-9\-_.]+\.vercel\.app$/.test(origin)) return true;
+  // Allow Craviti domains (*.craviti.com, *.cravti.com)
+  if (/^https?:\/\/(www\.)?(cravti|craviti)\.[a-z]+$/.test(origin)) return true;
+  // Permissive fallback in production for public mobile customer QR ordering
+  return true;
 };
 
 const corsOptions = {
@@ -55,11 +65,25 @@ const corsOptions = {
     if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
-    return callback(null, false);
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  allowedHeaders: [
+    'Origin',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'X-Requested-With',
+    'X-Guest-Id',
+    'X-Device-Id',
+    'X-Session-Id',
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  optionsSuccessStatus: 200,
 };
 
 app.use(cors(corsOptions));

@@ -2,13 +2,32 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import env from '../config/env.js';
 
-const api = axios.create({
+export const api = axios.create({
   baseURL: env.API_BASE_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
   withCredentials: true,
+});
+
+/**
+ * Dedicated Public API instance for Customer QR Ordering
+ * NEVER attaches Authorization headers, tokens, or cookies
+ */
+export const publicApi = axios.create({
+  baseURL: env.API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: false,
+});
+
+publicApi.interceptors.request.use((config) => {
+  delete config.headers.Authorization;
+  config.withCredentials = false;
+  return config;
 });
 
 /**
@@ -32,13 +51,20 @@ const isTokenExpired = (token) => {
  * Helper to identify public customer ordering routes
  * Never strips tokens from restaurant admin endpoints (/menu, /orders, /categories, etc.)
  */
-const isPublicCustomerRoute = (url, pathname = '') => {
-  if (typeof pathname === 'string' && pathname.startsWith('/order/')) {
+export const isPublicCustomerRoute = (url = '', pathname = '') => {
+  const cleanPath = typeof pathname === 'string' ? pathname.toLowerCase() : '';
+  const cleanUrl = typeof url === 'string' ? url.toLowerCase() : '';
+
+  if (cleanPath.startsWith('/order/')) return true;
+  if (
+    cleanUrl.startsWith('/order/') ||
+    cleanUrl.startsWith('/customer/') ||
+    cleanUrl.startsWith('/payment/create-order') ||
+    cleanUrl.startsWith('/payment/verify') ||
+    cleanUrl === '/order' ||
+    cleanUrl === '/customer'
+  ) {
     return true;
-  }
-  if (typeof url === 'string') {
-    // Only customer ordering API endpoints start with /order/ (singular)
-    if (url.startsWith('/order/')) return true;
   }
   return false;
 };
@@ -54,9 +80,10 @@ api.interceptors.request.use(
     const isPublicCustomer = isPublicCustomerRoute(config.url, currentPath);
 
     // STRICT TOKEN ISOLATION:
-    // Only customer ordering routes omit authentication headers
+    // Only customer ordering routes omit authentication headers and cookies
     if (isPublicCustomer) {
       delete config.headers.Authorization;
+      config.withCredentials = false;
       return config;
     }
 
@@ -104,6 +131,12 @@ api.interceptors.response.use(
 
     switch (status) {
       case 401: {
+        const isPublic = isPublicCustomerRoute(originalRequest?.url, currentPath);
+        // Never logout, warn, or redirect on public customer routes or public auth pages
+        if (isPublic || currentPath === '/login' || currentPath === '/signup' || currentPath.startsWith('/order/')) {
+          return Promise.reject(error);
+        }
+
         const currentToken =
           localStorage.getItem('restaurantAccessToken') ||
           localStorage.getItem('craviti_token');
@@ -116,11 +149,6 @@ api.interceptors.response.use(
           isRetry: !!originalRequest?._retry,
           serverMessage,
         });
-
-        // 1. Never logout or redirect on public customer routes or public auth pages
-        if (currentPath === '/login' || currentPath === '/signup' || currentPath.startsWith('/order/')) {
-          break;
-        }
 
         // 2. Defensive Retry: If request hasn't been retried yet, and we have a valid, unexpired token,
         // re-attach the Authorization header and retry once instead of immediately logging out.

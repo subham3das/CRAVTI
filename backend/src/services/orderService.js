@@ -151,13 +151,13 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '
     .lean();
 
   if (!restaurant) {
-    const error = new Error('Restaurant not found or unavailable');
+    const error = new Error('Restaurant not found');
     error.statusCode = 404;
     throw error;
   }
 
-  if (restaurant.isActive === false) {
-    const error = new Error('This restaurant is currently closed or suspended');
+  if (restaurant.isActive === false || restaurant.verificationStatus === 'rejected') {
+    const error = new Error('Restaurant unavailable');
     error.statusCode = 403;
     throw error;
   }
@@ -192,6 +192,19 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '
     table = await Table.findOne(tableQuery)
       .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
       .lean();
+
+    if (!table) {
+      const error = new Error('Table not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (table.isActive === false || table.status === 'disabled') {
+      const error = new Error('Table is currently inactive or disabled for ordering');
+      error.statusCode = 403;
+      error.code = 'TABLE_DISABLED';
+      throw error;
+    }
   }
 
   // If table not found or not provided, fallback to first active table or default structure
@@ -214,26 +227,13 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '
     };
   }
 
-  // Validate QR token if supplied
+  // Track QR scan telemetry non-blockingly
   const qrRecord = await QRCodeModel.findOne({
     restaurantId: restaurant._id,
     tableId: table._id,
     isDeleted: false,
   });
 
-  if (token) {
-    const activeToken = qrRecord?.qrToken || table.qrToken;
-    const isTokenActive = qrRecord ? qrRecord.isActive : table.isActive;
-
-    if (!activeToken || activeToken !== token || !isTokenActive) {
-      const error = new Error('Invalid or revoked QR code. Please scan the current table QR code.');
-      error.statusCode = 403;
-      error.code = 'INVALID_QR_TOKEN';
-      throw error;
-    }
-  }
-
-  // Track QR scan telemetry
   if (qrRecord) {
     QRCodeModel.findByIdAndUpdate(qrRecord._id, {
       $inc: { scansCount: 1 },
@@ -328,6 +328,7 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '
     restaurant,
     table,
     categories,
+    items: menuItems,
     menuItems,
     settings: {
       restaurantStatus: settings.restaurantStatus || 'open',

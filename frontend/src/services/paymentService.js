@@ -1,7 +1,7 @@
-import api from './api';
+import { api, publicApi } from './api';
 
 /**
- * Customer / Public Payment APIs
+ * Customer / Public Payment APIs (No auth headers or cookies)
  */
 export const createPaymentOrderApi = async ({
   orderId,
@@ -9,7 +9,7 @@ export const createPaymentOrderApi = async ({
   customerPhone = '',
   guestSessionId = '',
 }) => {
-  const response = await api.post('/payment/create-order', {
+  const response = await publicApi.post('/payment/create-order', {
     orderId,
     customerEmail,
     customerPhone,
@@ -24,7 +24,7 @@ export const verifyPaymentApi = async ({
   razorpayPaymentId,
   razorpaySignature,
 }) => {
-  const response = await api.post('/payment/verify', {
+  const response = await publicApi.post('/payment/verify', {
     orderId,
     razorpayOrderId,
     razorpayPaymentId,

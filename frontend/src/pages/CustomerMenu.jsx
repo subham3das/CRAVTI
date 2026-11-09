@@ -106,17 +106,25 @@ const CustomerMenuContent = () => {
           deviceId,
           activeToken
         );
-        if (res.success && res.data) {
-          setRestaurant(res.data.restaurant);
-          setTable(res.data.table);
-          setCategories(res.data.categories || []);
-          const liveItems = res.data.menuItems || [];
+        if (res.success && (res.data || res.restaurant)) {
+          const restaurantData = res.data?.restaurant || res.restaurant || null;
+          const tableData = res.data?.table || res.table || null;
+          const categoriesData = res.data?.categories || res.categories || [];
+          const liveItems = res.data?.menuItems || res.data?.items || res.items || res.menuItems || [];
+          const settingsData = res.data?.settings || res.settings || null;
+          const activeOrderData = res.data?.activeOrder || res.activeOrder || null;
+          const orderLocked = Boolean(res.data?.isOrderLocked ?? res.isOrderLocked);
+          const paymentWaiting = Boolean(res.data?.waitingForPayment ?? res.waitingForPayment);
+
+          setRestaurant(restaurantData);
+          setTable(tableData);
+          setCategories(categoriesData);
           setMenuItems(liveItems);
-          setSettings(res.data.settings || null);
-          setIsOrderLocked(Boolean(res.data.isOrderLocked));
-          setWaitingForPayment(Boolean(res.data.waitingForPayment));
-          if (res.data.activeOrder) {
-            setActiveOrder(res.data.activeOrder);
+          setSettings(settingsData);
+          setIsOrderLocked(orderLocked);
+          setWaitingForPayment(paymentWaiting);
+          if (activeOrderData) {
+            setActiveOrder(activeOrderData);
           }
           // Live sync cart items with latest prices and availability
           if (typeof syncCartWithLiveMenu === 'function') {

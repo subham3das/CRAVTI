@@ -10,6 +10,16 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchSession = useCallback(async () => {
+    // PUBLIC CUSTOMER ORDERING ROUTE CHECK:
+    // If the user is on the customer ordering interface (/order/...), NEVER verify restaurant session
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname : '';
+    if (currentPath.startsWith('/order/')) {
+      setUser(null);
+      setRestaurant(null);
+      setLoading(false);
+      return;
+    }
+
     // STRICT TOKEN ISOLATION: Restaurant Panel only uses restaurantAccessToken
     const token =
       localStorage.getItem('restaurantAccessToken') ||
