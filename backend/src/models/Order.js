@@ -139,7 +139,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['placed', 'accepted', 'served', 'completed', 'cancelled'],
+      enum: ['placed', 'accepted', 'served', 'completed', 'cancelled', 'PAID', 'paid'],
       default: 'placed',
       index: true,
     },
@@ -154,12 +154,12 @@ const orderSchema = new mongoose.Schema(
     },
     cashierStatus: {
       type: String,
-      enum: ['unpaid', 'paid'],
+      enum: ['unpaid', 'paid', 'PAID', 'paid_online'],
       default: 'unpaid',
     },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid_online', 'paid_cash', 'refunded'],
+      enum: ['pending', 'paid_online', 'paid_cash', 'refunded', 'SUCCESS', 'success', 'PAID', 'paid', 'FAILED', 'failed'],
       default: 'pending',
       index: true,
     },

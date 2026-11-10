@@ -72,15 +72,18 @@ export const validateEnv = () => {
   const razorpayKeys = [
     { key: 'RAZORPAY_KEY_ID', desc: 'Razorpay Key ID' },
     { key: 'RAZORPAY_KEY_SECRET', desc: 'Razorpay Key Secret' },
+    { key: 'RAZORPAY_WEBHOOK_SECRET', desc: 'Razorpay Webhook Secret (HMAC SHA256 Signature Verification)' },
   ];
 
   for (const item of razorpayKeys) {
     const val = process.env[item.key];
     if (!val || val.includes('YOUR_')) {
-      if (isProduction) {
+      if (isProduction && item.key !== 'RAZORPAY_WEBHOOK_SECRET') {
         missing.push(`${item.key} (${item.desc})`);
+      } else if (isProduction && item.key === 'RAZORPAY_WEBHOOK_SECRET') {
+        warnings.push(`${item.key} is not configured in production. Webhook signature verification will reject incoming webhooks.`);
       } else {
-        warnings.push(`${item.key} is missing. Payment test orders will run in mock mode.`);
+        warnings.push(`${item.key} is missing. Payment test orders will run in mock mode and webhooks require local mock secret.`);
       }
     }
   }

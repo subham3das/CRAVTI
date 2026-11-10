@@ -81,6 +81,8 @@ const corsOptions = {
     'X-Guest-Id',
     'X-Device-Id',
     'X-Session-Id',
+    'X-Razorpay-Signature',
+    'X-Razorpay-Event-Id',
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   optionsSuccessStatus: 200,
@@ -99,6 +101,16 @@ app.use(mongoSanitize);
 // Compression & Body Parsers with size limits
 app.use(compression());
 app.use(morgan(env.IS_PRODUCTION ? 'combined' : 'dev'));
+
+// =========================================================================
+// Razorpay Webhook Raw Body Parser (MUST be mounted before global express.json())
+// Captures pristine unparsed Buffer stream for cryptographic HMAC SHA256 validation
+// =========================================================================
+app.use(
+  ['/api/payments/webhook', '/api/payment/webhook'],
+  express.raw({ type: '*/*', limit: '5mb' })
+);
+
 app.use(
   express.json({
     limit: '10mb',

@@ -50,24 +50,51 @@ export const verifyPayment = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/payments/webhook
  * POST /api/payment/webhook
- * Razorpay automated webhook receiver
+ * Razorpay automated webhook receiver (Public route - protected exclusively by HMAC SHA256 signature)
  */
-export const handlePaymentWebhook = asyncHandler(async (req, res) => {
+export const handlePaymentWebhook = async (req, res) => {
+  const startTime = Date.now();
   const signature = req.headers['x-razorpay-signature'];
+
   if (!signature) {
-    return sendError(res, 'Missing webhook signature header', 'Missing signature', HTTP_STATUS.BAD_REQUEST);
+    console.warn('[Razorpay Webhook] Rejected: Missing x-razorpay-signature header');
+    return res.status(400).json({
+      success: false,
+      message: 'Missing x-razorpay-signature header',
+    });
   }
 
   // Raw body required for cryptographic HMAC verification
-  const rawBody = req.rawBody || JSON.stringify(req.body);
-  const result = await handleRazorpayWebhookService({
-    rawBody,
-    signature,
-  });
+  const rawBody = Buffer.isBuffer(req.body)
+    ? req.body
+    : req.rawBody || Buffer.from(typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {}), 'utf8');
 
-  return res.status(200).json({ status: 'ok', ...result });
-});
+  try {
+    const result = await handleRazorpayWebhookService({
+      rawBody,
+      signature,
+      headers: req.headers,
+      startTime,
+    });
+
+    return res.status(200).json({
+      status: 'ok',
+      ...result,
+    });
+  } catch (err) {
+    console.error(`[Razorpay Webhook] Processing error: ${err.message}`);
+    const statusCode = err.statusCode === 500 ? 500 : 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: err.message || 'Webhook verification failed',
+    });
+  }
+};
+
+// Export alias razorpayWebhook matching user's exact specification
+export const razorpayWebhook = handlePaymentWebhook;
 
 /**
  * GET /api/payment/gateway-status

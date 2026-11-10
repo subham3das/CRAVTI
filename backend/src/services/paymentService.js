@@ -445,112 +445,13 @@ export const refundPaymentService = async ({
   };
 };
 
+import { processRazorpayWebhook } from './webhookService.js';
+
 /**
  * 4. Verify and Handle Razorpay Webhooks
  */
-export const handleRazorpayWebhookService = async ({ rawBody, signature }) => {
-  const webhookSecret = env.RAZORPAY_WEBHOOK_SECRET?.trim();
-  if (!webhookSecret) {
-    const error = new Error('Razorpay webhook secret not configured.');
-    error.statusCode = 500;
-    throw error;
-  }
-
-  const expectedSignature = crypto
-    .createHmac('sha256', webhookSecret)
-    .update(rawBody)
-    .digest('hex');
-
-  if (!safeCompare(expectedSignature, signature)) {
-    const error = new Error('Invalid webhook cryptographic signature.');
-    error.statusCode = 400;
-    throw error;
-  }
-
-  const eventData = JSON.parse(rawBody.toString('utf8'));
-  const event = eventData.event;
-  const payload = eventData.payload;
-
-  console.log(`[Razorpay Webhook] Received event: ${event}`);
-
-  switch (event) {
-    case 'payment.captured': {
-      const paymentEntity = payload.payment.entity;
-      const rzpOrderId = paymentEntity.order_id;
-      const rzpPaymentId = paymentEntity.id;
-
-      const payment = await Payment.findOne({ razorpayOrderId: rzpOrderId });
-      if (payment && payment.status !== 'captured') {
-        payment.status = 'captured';
-        payment.razorpayPaymentId = rzpPaymentId;
-        payment.method = paymentEntity.method || 'online';
-        payment.auditHistory.push({
-          action: 'WEBHOOK_PAYMENT_CAPTURED',
-          status: 'captured',
-          actor: 'razorpay_webhook',
-          timestamp: new Date(),
-          details: paymentEntity,
-        });
-        await payment.save();
-
-        const order = await Order.findById(payment.orderId);
-        if (order && order.paymentStatus !== 'paid_online') {
-          order.paymentStatus = 'paid_online';
-          order.cashierStatus = 'paid';
-          order.status = 'completed';
-          await order.save();
-          await generateReceiptSnapshot(order._id);
-        }
-      }
-      break;
-    }
-
-    case 'payment.failed': {
-      const paymentEntity = payload.payment.entity;
-      const rzpOrderId = paymentEntity.order_id;
-
-      await Payment.findOneAndUpdate(
-        { razorpayOrderId: rzpOrderId },
-        {
-          $set: { status: 'failed', razorpayPaymentId: paymentEntity.id },
-          $push: {
-            auditHistory: {
-              action: 'WEBHOOK_PAYMENT_FAILED',
-              status: 'failed',
-              actor: 'razorpay_webhook',
-              timestamp: new Date(),
-              details: { errorCode: paymentEntity.error_code, description: paymentEntity.error_description },
-            },
-          },
-        }
-      );
-      break;
-    }
-
-    case 'refund.processed': {
-      const refundEntity = payload.refund.entity;
-      const rzpPaymentId = refundEntity.payment_id;
-
-      const payment = await Payment.findOne({ razorpayPaymentId: rzpPaymentId });
-      if (payment && payment.status !== 'refunded') {
-        payment.status = 'refunded';
-        payment.refundHistory.push({
-          refundId: refundEntity.id,
-          amount: refundEntity.amount / 100,
-          status: 'processed',
-          reason: refundEntity.notes?.reason || 'Webhook processed refund',
-          createdAt: new Date(),
-        });
-        await payment.save();
-      }
-      break;
-    }
-
-    default:
-      console.log(`[Razorpay Webhook] Unhandled event: ${event}`);
-  }
-
-  return { received: true, event };
+export const handleRazorpayWebhookService = async ({ rawBody, signature, headers, startTime }) => {
+  return processRazorpayWebhook({ rawBody, signature, headers, startTime });
 };
 
 /**

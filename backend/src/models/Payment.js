@@ -27,18 +27,24 @@ const paymentSchema = new mongoose.Schema(
     restaurantId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Restaurant',
-      required: true,
+      default: null,
       index: true,
     },
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Order',
-      required: true,
+      default: null,
       index: true,
     },
     receiptId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Receipt',
+      default: null,
+      index: true,
+    },
+    tableId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Table',
       default: null,
       index: true,
     },
@@ -58,6 +64,11 @@ const paymentSchema = new mongoose.Schema(
       default: '',
       index: true,
     },
+    paymentId: {
+      type: String,
+      default: '',
+      index: true,
+    },
     razorpaySignature: {
       type: String,
       default: '',
@@ -72,9 +83,50 @@ const paymentSchema = new mongoose.Schema(
       default: 'INR',
       uppercase: true,
     },
+    fee: {
+      type: Number,
+      default: 0,
+    },
+    tax: {
+      type: Number,
+      default: 0,
+    },
+    capturedAt: {
+      type: Date,
+      default: null,
+    },
+    failureReason: {
+      type: String,
+      default: '',
+    },
+    refundId: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    refundAmount: {
+      type: Number,
+      default: 0,
+    },
+    refundDate: {
+      type: Date,
+      default: null,
+    },
     status: {
       type: String,
-      enum: ['created', 'authorized', 'captured', 'failed', 'refunded'],
+      enum: [
+        'created',
+        'authorized',
+        'captured',
+        'failed',
+        'refunded',
+        'success',
+        'SUCCESS',
+        'FAILED',
+        'REFUNDED',
+        'PAID',
+        'paid',
+      ],
       default: 'created',
       index: true,
     },

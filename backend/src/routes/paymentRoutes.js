@@ -1,9 +1,10 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import {
   createPaymentOrder,
   verifyPayment,
   handlePaymentWebhook,
+  razorpayWebhook,
   getPaymentById,
   refundPayment,
   getGatewayStatus,
@@ -28,12 +29,32 @@ import env from '../config/env.js';
 
 const router = Router();
 
+// =========================================================================
+// Razorpay Webhook (PUBLIC - STRICTLY NO AUTHENTICATION MIDDLEWARE)
+// Security relies EXCLUSIVELY on Razorpay HMAC SHA256 signature verification
+// =========================================================================
+
+// Explicit Method Guard: Return 405 for GET / PUT / DELETE so browsers or testers never hit :paymentId with JWT
+router.all('/webhook', (req, res, next) => {
+  if (req.method === 'POST') return next();
+  return res.status(405).json({
+    success: false,
+    message: 'Method Not Allowed. Razorpay webhooks only accept POST requests with HMAC SHA256 signature.',
+  });
+});
+
+// Webhook receiver with raw request body buffer parsing
+router.post(
+  '/webhook',
+  express.raw({ type: '*/*', limit: '5mb' }),
+  razorpayWebhook
+);
+
 // ==========================================
 // Customer / Public Payment Checkout Routes
 // ==========================================
 router.post('/create-order', createPaymentOrder);
 router.post('/verify', verifyPayment);
-router.post('/webhook', handlePaymentWebhook);
 
 // ==========================================
 // Restaurant Owner Settings & Diagnostics
