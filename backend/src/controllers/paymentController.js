@@ -24,12 +24,21 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     guestSessionId,
     restaurantSlug,
     tableIdentifier,
+    tableId,
     guestId,
     deviceId,
     sessionId,
     customerName,
     items,
+    paymentMethod,
+    taxes,
+    discounts,
+    subtotal,
+    grandTotal,
   } = req.body;
+
+  const effectiveTable = tableId || tableIdentifier;
+  const effectiveSessionId = guestSessionId || sessionId;
 
   if (!orderId && (!restaurantSlug || !items || !items.length)) {
     return sendError(
@@ -44,14 +53,20 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     orderId,
     customerEmail,
     customerPhone,
-    guestSessionId,
+    guestSessionId: effectiveSessionId,
     restaurantSlug,
-    tableIdentifier,
+    tableIdentifier: effectiveTable,
+    tableId: effectiveTable,
     guestId,
     deviceId,
-    sessionId,
+    sessionId: effectiveSessionId,
     customerName,
     items,
+    paymentMethod,
+    taxes,
+    discounts,
+    subtotal,
+    grandTotal,
   });
 
   return sendSuccess(res, 'Payment order created successfully', orderData, HTTP_STATUS.CREATED);

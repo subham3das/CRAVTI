@@ -18,6 +18,13 @@ export const getOrCreateSessionId = () => {
   return sessionId;
 };
 
+export const regenerateSessionId = () => {
+  const KEY = 'craviti_session_id';
+  const sessionId = 'ses_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+  sessionStorage.setItem(KEY, sessionId);
+  return sessionId;
+};
+
 export const getOrCreateGuestId = () => {
   const KEY = 'craviti_guest_id';
   let guestId = localStorage.getItem(KEY);

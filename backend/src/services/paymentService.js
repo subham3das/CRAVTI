@@ -104,14 +104,20 @@ export const createPaymentOrderService = async ({
     }
 
     // Resolve Table
-    let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
-    const parsedNum = parseInt(tableIdentifier, 10);
-    if (!isNaN(parsedNum)) {
-      tableQuery.tableNumber = parsedNum;
-    } else if (tableIdentifier) {
-      tableQuery._id = tableIdentifier;
+    let table = null;
+    const effectiveTable = (tableId || tableIdentifier || '').toString().trim();
+    if (mongoose.Types.ObjectId.isValid(effectiveTable) && effectiveTable.length === 24) {
+      table = await Table.findOne({ _id: effectiveTable, restaurantId: restaurant._id, isDeleted: { $ne: true } });
     }
-    table = await Table.findOne(tableQuery);
+    if (!table) {
+      const parsedNum = parseInt(effectiveTable, 10);
+      if (!isNaN(parsedNum)) {
+        table = await Table.findOne({ tableNumber: parsedNum, restaurantId: restaurant._id, isDeleted: { $ne: true } });
+      }
+    }
+    if (!table && effectiveTable) {
+      table = await Table.findOne({ _id: effectiveTable, restaurantId: restaurant._id, isDeleted: { $ne: true } });
+    }
     if (!table) {
       const error = new Error('Table not found');
       error.statusCode = 404;
@@ -124,7 +130,7 @@ export const createPaymentOrderService = async ({
     }
 
     // Validate items against DB
-    const itemIds = items.map((i) => i.menuItemId || i.itemId);
+    const itemIds = items.map((i) => i.menuItemId || i.itemId || i._id).filter(Boolean);
     const dbItems = await MenuItem.find({
       _id: { $in: itemIds },
       restaurantId: restaurant._id,
@@ -302,13 +308,14 @@ export const createPaymentOrderService = async ({
     amount: grandTotal,
     amountInPaise,
     currency: 'INR',
+    key: env.RAZORPAY_KEY_ID?.trim() || '',
     keyId: env.RAZORPAY_KEY_ID?.trim() || '',
     orderId: order?._id || null,
     orderNumber: order?.orderNumber || null,
     restaurantName: restaurant.restaurantName,
     description: order
       ? `Order #${order.orderNumber} - Table ${order.tableNumber}`
-      : `Table ${table?.tableNumber} Order — ${restaurant.restaurantName}`,
+      : `Table ${table?.tableNumber || 1} Order — ${restaurant.restaurantName}`,
     prefill: {
       name: (order ? order.customerName : customerName) || 'Guest',
       email: customerEmail || '',

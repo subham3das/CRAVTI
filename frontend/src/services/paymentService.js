@@ -2,34 +2,15 @@ import { api, publicApi } from './api';
 
 /**
  * Customer / Public Payment APIs (No auth headers or cookies)
+ * Forwards full payload (orderId, restaurantSlug, tableId, guestSessionId, items, paymentMethod, etc.)
  */
-export const createPaymentOrderApi = async ({
-  orderId,
-  customerEmail = '',
-  customerPhone = '',
-  guestSessionId = '',
-}) => {
-  const response = await publicApi.post('/payment/create-order', {
-    orderId,
-    customerEmail,
-    customerPhone,
-    guestSessionId,
-  });
+export const createPaymentOrderApi = async (payload = {}) => {
+  const response = await publicApi.post('/payment/create-order', payload);
   return response.data;
 };
 
-export const verifyPaymentApi = async ({
-  orderId,
-  razorpayOrderId,
-  razorpayPaymentId,
-  razorpaySignature,
-}) => {
-  const response = await publicApi.post('/payment/verify', {
-    orderId,
-    razorpayOrderId,
-    razorpayPaymentId,
-    razorpaySignature,
-  });
+export const verifyPaymentApi = async (payload = {}) => {
+  const response = await publicApi.post('/payment/verify', payload);
   return response.data;
 };
 
@@ -102,5 +83,3 @@ export const exportRestaurantPaymentsCsvApi = async (params = {}) => {
   });
   return response.data;
 };
-
-

@@ -26,7 +26,13 @@ import { CustomerCartDrawer } from '../components/customer/CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from '../components/customer/CustomerOrderSuccessModal';
 import { CustomerFooter } from '../components/customer/CustomerFooter';
 import { ImageWithFallback } from '../components/ImageWithFallback';
-import { getOrCreateGuestId, getOrCreateDeviceId, getOrCreateSessionId, setGuestId } from '../utils/guestSession';
+import {
+  getOrCreateGuestId,
+  getOrCreateDeviceId,
+  getOrCreateSessionId,
+  regenerateSessionId,
+  setGuestId,
+} from '../utils/guestSession';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
 
@@ -312,8 +318,33 @@ const CustomerMenuContent = () => {
   // Robust Order Placement with Idempotent Prepay and Cash Flows
   const handlePlaceOrder = async ({ customerName, customerPhone, paymentMethod = 'cash' }) => {
     if (isSubmittingRef.current || isPlacingOrder) return;
+
+    // Resolve required identifiers
+    const effectiveSlug = (restaurantSlug || restaurant?.slug || '').trim();
+    const effectiveTableId = (table?._id || table?.tableNumber || tableNumber || tableId || activeTable || '').toString().trim();
+
+    // Validate / Regenerate Guest Session ID
+    let effectiveSessionId = getOrCreateSessionId();
+    if (!effectiveSessionId) {
+      effectiveSessionId = regenerateSessionId();
+    }
+
+    // Required Frontend validations before calling payment API:
+    // 1. if (!restaurantSlug) block payment
+    if (!effectiveSlug) {
+      toast.error('Restaurant information is missing. Please reload or re-scan the QR code.');
+      return;
+    }
+
+    // 2. if (!items.length) block payment
     if (!cart || cart.length === 0) {
-      toast.error('Your cart is empty');
+      toast.error('Your cart is empty. Please add items before placing order.');
+      return;
+    }
+
+    // 3. if (!tableId) block payment
+    if (!effectiveTableId) {
+      toast.error('Table identification is missing. Please re-scan table QR code.');
       return;
     }
 
@@ -323,12 +354,21 @@ const CustomerMenuContent = () => {
 
       const guestId = getOrCreateGuestId();
       const deviceId = getOrCreateDeviceId();
-      const sessionId = getOrCreateSessionId();
 
-      const itemsPayload = cart.map((i) => ({
-        menuItemId: i.menuItemId,
-        quantity: i.quantity,
-        specialInstructions: i.specialInstructions || '',
+      // Collect complete cart items (quantity, price, notes, discounts)
+      const completeCartItems = cart.map((i) => ({
+        menuItemId: i.menuItemId || i._id,
+        itemId: i.menuItemId || i._id,
+        itemName: i.itemName || i.name || 'Dish',
+        name: i.itemName || i.name || 'Dish',
+        quantity: Math.max(1, parseInt(i.quantity, 10) || 1),
+        price: Number(i.price) || 0,
+        sellingPrice: Number(i.sellingPrice) || Number(i.price) || 0,
+        notes: i.specialInstructions?.trim() || '',
+        specialInstructions: i.specialInstructions?.trim() || '',
+        discount: Number(i.discount) || 0,
+        foodType: i.foodType || 'veg',
+        image: i.image?.url || i.image || '',
       }));
 
       // FLOW A: ONLINE PAYMENT (PREPAY)
@@ -336,17 +376,29 @@ const CustomerMenuContent = () => {
       // Order created in DB ONLY after successful HMAC signature verification.
       // If cancelled or failed: Cart is 100% preserved, no order created.
       if (paymentMethod === 'online') {
-        const payRes = await createPaymentOrderApi({
-          restaurantSlug,
-          tableIdentifier: activeTable,
+        const paymentPayload = {
+          restaurantSlug: effectiveSlug,
+          tableId: effectiveTableId,
+          tableIdentifier: effectiveTableId,
+          guestSessionId: effectiveSessionId,
+          sessionId: effectiveSessionId,
           guestId,
           deviceId,
-          guestSessionId: sessionId,
-          customerName: customerName || 'Guest',
-          customerPhone: customerPhone || '',
+          customerName: customerName?.trim() || 'Guest',
+          customerPhone: customerPhone?.trim() || '',
           customerEmail: '',
-          items: itemsPayload,
-        });
+          items: completeCartItems,
+          paymentMethod: 'online',
+          notes: completeCartItems.map((i) => i.notes).filter(Boolean).join('; '),
+          taxes: taxAmount,
+          taxAmount,
+          taxPercent,
+          discounts: discount,
+          subtotal,
+          grandTotal: calculatedGrandTotal,
+        };
+
+        const payRes = await createPaymentOrderApi(paymentPayload);
 
         if (!payRes.success || !payRes.data) {
           throw new Error(payRes.message || 'Failed to initialize payment gateway.');
@@ -361,13 +413,14 @@ const CustomerMenuContent = () => {
                 ...verifyPayload,
               });
 
-              if (vRes.success && vRes.order) {
+              if (vRes.success && (vRes.order || vRes.data?.order)) {
+                const confirmedOrder = vRes.order || vRes.data?.order;
                 clearCart();
                 setIsCartOpen(false);
-                setActiveOrder(vRes.order);
-                setPlacedOrder(vRes.order);
+                setActiveOrder(confirmedOrder);
+                setPlacedOrder(confirmedOrder);
                 toast.success('Payment verified! Your order has been placed.');
-                navigate(`/order/track/${vRes.order._id}`);
+                navigate(`/order/track/${confirmedOrder._id}`);
               } else {
                 toast.error(vRes.message || 'Payment verification failed.');
               }
@@ -380,16 +433,23 @@ const CustomerMenuContent = () => {
             }
           },
           onDismiss: () => {
-            // Cart preserved!
+            // Requirement 7: Do NOT create order. Do NOT clear cart. Keep checkout open. Show retry message.
             setIsPlacingOrder(false);
             isSubmittingRef.current = false;
-            toast('Payment cancelled. Your cart has been preserved.', { icon: '🛒' });
+            setIsCartOpen(true);
+            toast('Payment was cancelled. Your cart has been preserved. You can retry checkout anytime.', {
+              icon: '🛒',
+              duration: 5000,
+            });
           },
           onError: (pErr) => {
-            // Cart preserved!
+            // Requirement 7: Do NOT create order. Do NOT clear cart. Keep checkout open. Show retry message.
             setIsPlacingOrder(false);
             isSubmittingRef.current = false;
-            toast.error(pErr.message || 'Payment failed. No order was placed.');
+            setIsCartOpen(true);
+            toast.error(pErr.message || 'Payment failed. No order was placed. Please retry checkout.', {
+              duration: 6000,
+            });
           },
         });
         return;
@@ -398,15 +458,20 @@ const CustomerMenuContent = () => {
       // FLOW B: CASH PAYMENT (POSTPAY)
       // Places order immediately with status: placed, paymentStatus: pending, cashierStatus: unpaid
       const orderPayload = {
-        restaurantSlug,
-        tableIdentifier: activeTable,
+        restaurantSlug: effectiveSlug,
+        tableId: effectiveTableId,
+        tableIdentifier: effectiveTableId,
         guestId,
         deviceId,
-        sessionId,
-        customerName: customerName || 'Guest',
-        customerPhone: customerPhone || '',
+        sessionId: effectiveSessionId,
+        customerName: customerName?.trim() || 'Guest',
+        customerPhone: customerPhone?.trim() || '',
         paymentMethod: 'cash',
-        items: itemsPayload,
+        items: completeCartItems.map((i) => ({
+          menuItemId: i.menuItemId,
+          quantity: i.quantity,
+          specialInstructions: i.notes || '',
+        })),
       };
 
       const res = await placeCustomerOrderApi(orderPayload);

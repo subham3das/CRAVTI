@@ -44,11 +44,11 @@ export const openRazorpayModal = async ({
   }
 
   const options = {
-    key: orderData.keyId || env.RAZORPAY_KEY_ID || '',
-    amount: orderData.amountInPaise,
+    key: orderData.key || orderData.keyId || env.RAZORPAY_KEY_ID || '',
+    amount: orderData.amountInPaise || Math.round((orderData.amount || 0) * 100),
     currency: orderData.currency || 'INR',
     name: orderData.restaurantName || 'Craviti Dining',
-    description: orderData.description || `Order #${orderData.orderNumber}`,
+    description: orderData.description || (orderData.orderNumber ? `Order #${orderData.orderNumber}` : 'Table Dining Order'),
     order_id: orderData.razorpayOrderId,
     prefill: {
       name: orderData.prefill?.name || 'Guest',
