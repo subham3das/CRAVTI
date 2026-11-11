@@ -15,12 +15,12 @@ export const CustomerFooter = ({ compact = false, className = '' }) => {
 
   const legalLinks = [
     { label: 'Privacy Policy', href: `${baseUrl}/privacy-policy` },
-    { label: 'Terms & Conditions', href: `${baseUrl}/terms-and-conditions` },
+    { label: 'Terms', href: `${baseUrl}/terms-and-conditions` },
+    { label: 'Payment Policy', href: `${baseUrl}/payment-policy` },
     { label: 'Refund Policy', href: `${baseUrl}/refund-policy` },
-    { label: 'Shipping Policy', href: `${baseUrl}/shipping-policy` },
-    { label: 'Cookie Policy', href: `${baseUrl}/cookie-policy` },
-    { label: 'Disclaimer', href: `${baseUrl}/disclaimer` },
+    { label: 'Merchant Terms', href: `${baseUrl}/merchant-terms` },
     { label: 'Contact', href: `${baseUrl}/contact` },
+    { label: 'Support', href: `${baseUrl}/help` },
   ];
 
   if (compact) {

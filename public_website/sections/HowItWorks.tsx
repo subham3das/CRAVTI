@@ -37,11 +37,11 @@ const STEPS = [
   },
   {
     step: '04',
-    title: 'Direct T+1 Bank Payouts',
-    subtitle: 'Automated reconciliation',
-    desc: 'Online guest payments via Razorpay (UPI, GPay, Cards) settle directly into your verified bank account with automated GST invoicing and tamper-proof PDF receipts.',
+    title: 'Direct Merchant Bank Settlements',
+    subtitle: 'Automated reconciliation via Razorpay',
+    desc: 'Online guest payments via Razorpay (UPI, GPay, Cards) settle directly into your verified bank account according to standard domestic settlement timelines with automated GST invoicing and receipts.',
     icon: Banknote,
-    highlight: '100% Direct Payouts',
+    highlight: 'Direct Bank Settlement',
   },
 ];
 

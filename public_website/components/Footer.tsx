@@ -222,17 +222,27 @@ export const Footer = () => {
         <div>
           &copy; {new Date().getFullYear()} {SITE_CONFIG.legalName}. All rights reserved.
         </div>
-        <div className="flex items-center gap-6">
-          <span>Version 2.4.0 (Production Core)</span>
-          <span>ISO 27001 & SOC-2 Ready</span>
+        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
           <Link href="/privacy-policy" className="hover:text-slate-400">
-            Privacy
+            Privacy Policy
           </Link>
           <Link href="/terms-and-conditions" className="hover:text-slate-400">
             Terms
           </Link>
-          <Link href="/security" className="hover:text-slate-400">
-            Security
+          <Link href="/payment-policy" className="hover:text-slate-400">
+            Payment Policy
+          </Link>
+          <Link href="/refund-policy" className="hover:text-slate-400">
+            Refund Policy
+          </Link>
+          <Link href="/merchant-terms" className="hover:text-slate-400">
+            Merchant Terms
+          </Link>
+          <Link href="/contact" className="hover:text-slate-400">
+            Contact
+          </Link>
+          <Link href="/help" className="hover:text-slate-400">
+            Support
           </Link>
         </div>
       </div>

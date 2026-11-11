@@ -4,6 +4,7 @@ import { ProblemSolution } from '../sections/ProblemSolution';
 import { FeatureGrid } from '../sections/FeatureGrid';
 import { HowItWorks } from '../sections/HowItWorks';
 import { ProductPreviews } from '../sections/ProductPreviews';
+import { SecurePayments } from '../sections/SecurePayments';
 import { Testimonials } from '../sections/Testimonials';
 import { PricingSection } from '../sections/PricingSection';
 import { FAQSection } from '../sections/FAQSection';
@@ -18,6 +19,7 @@ export default function HomePage() {
       <FeatureGrid />
       <HowItWorks />
       <ProductPreviews />
+      <SecurePayments />
       <Testimonials />
       <PricingSection />
       <FAQSection />

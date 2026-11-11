@@ -23,16 +23,47 @@ We collect information directly from you when you register a restaurant account,
 **B. Dining Patron (Customer) Information:**
 - Order Details: Selected menu items, table number identifier, dietary modifications, order timestamps, and invoice amounts.
 - Contact Details: Optional customer name, phone number, and email address provided for receipt delivery and loyalty points.
-- Payment Information: Transaction references, payment method (UPI, Card, NetBanking, Cash), and gateway authorization tokens. We do not store raw credit card numbers or banking PINs.
+- Payment Metadata: Transaction reference identifiers, payment method (UPI, Card, Net Banking, Cash), and gateway authorization tokens.
+        `,
+      },
+      {
+        id: 'payment-information',
+        title: '2. Payment Information & Security',
+        content: `
+Craviti collects and processes only the information strictly required for dining order execution, payment reconciliation, and accounting compliance.
+
+**Information Collected for Payment Processing:**
+- Customer Name
+- Phone Number
+- Email Address (optional for digital receipt delivery)
+- Order Details & Itemized Breakdown
+- Restaurant ID & Merchant Name
+- Table Number Identifier
+- Transaction Amount & Currency
+- Selected Payment Method (e.g., UPI, Credit/Debit Card, Net Banking, Wallets, Cash)
+- Payment Gateway Transaction Reference / ID
+- Payment Status (Initiated, Captured, Failed, Refunded)
+- Tax Invoice Number & Timestamp
+
+**Strict Zero Credential Storage Policy:**
+Craviti strictly operates as an ordering facilitation and orchestration layer. **Craviti does NOT store:**
+- Credit or Debit Card Numbers (PAN)
+- Card Verification Value (CVV / CVC)
+- UPI PIN Numbers
+- Net Banking Passwords
+- One-Time Passwords (OTPs)
+- Sensitive Payment & Banking Credentials
+
+All financial transactions, card details, and payment authorizations are handled directly and securely by Razorpay Software Private Limited ("Razorpay"), one of India's trusted payment gateways, in compliance with Reserve Bank of India (RBI) regulations and PCI-DSS Level 1 security standards.
         `,
       },
       {
         id: 'how-we-use-information',
-        title: '2. How We Use Your Information',
+        title: '3. How We Use Your Information',
         content: `
 Craviti uses collected data to execute and optimize our core restaurant operating services:
 - Transmitting guest orders instantaneously to kitchen stations and billing counters via real-time WebSockets.
-- Processing payment authorizations and automated T+1 merchant bank settlements through certified gateways.
+- Processing payment authorizations and facilitating automated domestic merchant bank settlements through certified gateways.
 - Generating deterministic digital tax invoices and PDF receipts for customers.
 - Providing operational analytics, revenue summaries, and peak hour heatmaps for restaurant owners.
 - Preventing fraud, duplicate payment claims, and unauthorized chargebacks.
@@ -41,25 +72,25 @@ Craviti uses collected data to execute and optimize our core restaurant operatin
       },
       {
         id: 'data-sharing-and-disclosure',
-        title: '3. Data Sharing & Third-Party Processors',
+        title: '4. Data Sharing & Third-Party Processors',
         content: `
 We never sell, rent, or monetize your personal or dining data to third-party advertisers. We disclose data solely to trusted infrastructure partners bound by strict confidentiality:
-- **Payment Gateway:** Razorpay Software Private Limited for payment tokenization and banking settlement execution.
+- **Payment Gateway:** Razorpay Software Private Limited for payment tokenization, gateway authentication, and banking settlement execution.
 - **Cloud Infrastructure:** MongoDB Atlas and AWS Data Centers located within Indian jurisdiction for database persistence.
-- **Communication Infrastructure:** Twilio / Gupshup for SMS/WhatsApp digital receipt delivery and acoustic notification routing.
+- **Communication Infrastructure:** Certified SMS/WhatsApp providers for digital receipt delivery and notification routing.
 - **Legal & Regulatory Authorities:** When mandatory by law, court order, or governmental tax audit.
         `,
       },
       {
         id: 'data-security-retention',
-        title: '4. Data Security & Retention',
+        title: '5. Data Security & Retention',
         content: `
 All data in transit is encrypted using TLS 1.3 with SHA-256 HMAC authentication. Data at rest is encrypted using AES-256 standard. We retain merchant operational data for the duration of the active subscription plus 7 years to fulfill statutory taxation record obligations. Customer guest data is retained for 36 months before automated anonymization.
         `,
       },
       {
         id: 'your-privacy-rights',
-        title: '5. Your Privacy Rights',
+        title: '6. Your Privacy Rights',
         content: `
 Under applicable data protection frameworks, including the Digital Personal Data Protection Act (DPDPA), you have the right to inspect, correct, export, or request deletion of your personal records. To exercise any privacy right, contact our Data Protection Officer at privacy@craviti.com.
         `,
@@ -100,17 +131,30 @@ Merchants agree to:
         `,
       },
       {
+        id: 'payment-processing',
+        title: '4. Payment Processing & Gateway Operations',
+        content: `
+Customer payments for dining orders placed through the Craviti web interface are processed securely using Razorpay, an authorized payment aggregator licensed by the Reserve Bank of India (RBI).
+
+**Key Terms Governing Payments:**
+- **Role of Craviti:** Craviti facilitates digital menu browsing, item selection, order transmission to kitchen terminals, and payment orchestration with the payment gateway. Craviti is not a bank, banking agent, or licensed payment aggregator.
+- **Gateway Operations:** Payment authorization, capture, settlement, banking routing, chargeback administration, and dispute resolution are managed directly by Razorpay and partner clearing networks.
+- **Settlement Schedules:** Payout and settlement schedules are governed by Razorpay and applicable banking clearing systems. Craviti does not control banking clearing windows and does not guarantee exact settlement timings or specific hour windows.
+- **Payment Security:** All customer card and banking credentials are handled exclusively by Razorpay under PCI-DSS Level 1 compliance. Craviti never stores sensitive card numbers, CVVs, UPI PINs, or banking passwords.
+        `,
+      },
+      {
         id: 'subscription-fees-billing',
-        title: '4. Subscriptions & Billing',
+        title: '5. Subscriptions & Billing',
         content: `
 Platform access fees are billed in advance on a recurring monthly or annual basis. Fees are non-refundable except as explicitly provided in our Refund Policy. Craviti reserves the right to suspend or restrict access to restaurants with accounts overdue beyond 14 business days.
         `,
       },
       {
         id: 'limitation-of-liability',
-        title: '5. Limitation of Liability',
+        title: '6. Limitation of Liability',
         content: `
-In no event shall Craviti, its directors, employees, or partners be liable for indirect, punitive, or consequential damages, including loss of restaurant profits, inventory spoilage, or business interruption, exceeding the total platform subscription fees paid by you in the 3 months preceding the claim.
+In no event shall Craviti, its directors, employees, or partners be liable for indirect, punitive, or consequential damages, including loss of restaurant profits, inventory spoilage, banking delays, or business interruption, exceeding the total platform subscription fees paid by you in the 3 months preceding the claim.
         `,
       },
     ],
@@ -121,7 +165,7 @@ In no event shall Craviti, its directors, employees, or partners be liable for i
     lastUpdated: 'March 1, 2026',
     effectiveDate: 'March 1, 2026',
     summary:
-      'This Refund Policy outlines the conditions under which Craviti issues refunds for software subscriptions, hardware placards, and diner billing disputes.',
+      'This Refund Policy outlines the conditions under which Craviti issues refunds for software subscriptions, physical QR placards, and customer dining orders.',
     sections: [
       {
         id: 'subscription-refunds',
@@ -143,14 +187,234 @@ Custom engraved or printed QR table stands damaged in transit are replaced compl
         id: 'diner-disputes',
         title: '3. Diner Payment & Food Disputes',
         content: `
-Disputes concerning food quality, order fulfillment, dish preparation delays, or incorrect items served are the sole responsibility of the respective restaurant establishment. Craviti provides technical tools for restaurant managers to issue direct gateway refunds to diners through the Admin & Restaurant portals.
+Disputes concerning food preparation quality, order fulfillment, preparation delays, or incorrect dishes served are the sole operational responsibility of the respective restaurant establishment. Craviti provides technical tools for restaurant managers to review and approve direct refunds to diners through the Restaurant Management Portal.
+        `,
+      },
+      {
+        id: 'customer-refund-processing',
+        title: '4. Guest Refund Processing via Razorpay',
+        content: `
+For orders placed by dining guests through the Craviti digital ordering interface:
+- **Restaurant Approval:** Refunds are initiated exclusively after review and verification by the restaurant merchant or authorized store manager.
+- **Secure Processing:** Approved refunds are initiated securely through Razorpay directly back to the original payment source (UPI account, credit/debit card, or net banking facility) used during order placement.
+- **Processing Timelines:** The time required for refunded funds to reflect in the customer's account depends upon:
+  1. The customer's issuing bank and internal clearance policies
+  2. The specific payment method utilized (e.g., UPI settlements typically reflect faster than card or net banking rails)
+  3. Razorpay gateway reconciliation and banking settlement batch cycles
+- **Banking Disclaimers:** Craviti facilitates the technical refund transmission to Razorpay. Craviti does not hold customer funds and cannot expedite or control final interbank processing turnaround once the refund is successfully dispatched by the payment gateway.
         `,
       },
       {
         id: 'refund-processing-timeline',
-        title: '4. Refund Processing Timeline',
+        title: '5. Standard Refund Timelines',
         content: `
-Approved software subscription refunds and diner gateway refunds are processed through the original payment method within 5 to 7 business days, depending on the issuing bank or card network.
+Approved software subscription refunds and merchant-approved diner gateway refunds generally take between 5 to 7 business days to reflect on the customer's bank statement, depending on the issuing bank or card network clearance protocols.
+        `,
+      },
+    ],
+  },
+  'merchant-agreement': {
+    title: 'Merchant Service Agreement',
+    slug: 'merchant-agreement',
+    lastUpdated: 'March 1, 2026',
+    effectiveDate: 'March 1, 2026',
+    summary:
+      'The definitive agreement between Craviti and hospitality merchants governing commercial terms, payout verification, platform SLAs, and operational obligations.',
+    sections: [
+      {
+        id: 'commercial-terms',
+        title: '1. Commercial Relationship',
+        content: `
+Craviti provides software-as-a-service infrastructure to empower independent restaurant operators. Craviti is not a restaurant, food delivery aggregator, or food manufacturer.
+        `,
+      },
+      {
+        id: 'merchant-payment-settlement',
+        title: '2. Merchant Payment & Settlement',
+        content: `
+To enable online customer payments and receive automated bank settlements, partner restaurants may be required to provide:
+- Permanent Account Number (PAN) of the entity or proprietor
+- Goods and Services Tax Identification Number (GSTIN), where applicable
+- Food Safety and Standards Authority of India (FSSAI) license registration
+- Commercial Bank Account Number & IFSC Code
+- Canceled Cheque or Bank Passbook copy for account validation
+- Know Your Customer (KYC) documentation for authorized signatories
+- Verified operational contact details and registered establishment address
+
+**Purpose of Collection:**
+These details are utilized strictly for merchant onboarding, compliance checks, statutory taxation requirements, and executing direct bank settlements via Razorpay.
+
+**Settlement Terms & Timelines:**
+Where applicable, customer payments captured through the digital menu are settled into the merchant's verified bank account via Razorpay.
+- Settlement timelines are managed directly by Razorpay.
+- For most domestic merchants, the standard settlement schedule is generally T+2 working days after successful payment capture.
+- Actual settlement timing may vary depending on:
+  • Merchant verification and KYC documentation status
+  • Banking holidays, weekend clearing cycles, and bank operating hours
+  • Reserve Bank of India (RBI) regulations and settlement directives
+  • Periodic risk assessments, fraud reviews, and compliance evaluations
+  • Razorpay applicable settlement schedule and merchant category terms
+
+Craviti facilitates order management and payment orchestration. Craviti does not hold merchant funds in escrow or guarantee fixed payout windows.
+        `,
+      },
+      {
+        id: 'sla-uptime',
+        title: '3. Service Level Agreement (SLA)',
+        content: `
+We commit to a 99.99% monthly platform uptime target for our core guest ordering and kitchen display services, excluding scheduled maintenance announced 48 hours in advance.
+        `,
+      },
+    ],
+  },
+  'merchant-terms': {
+    title: 'Merchant Terms & Service Agreement',
+    slug: 'merchant-terms',
+    lastUpdated: 'March 1, 2026',
+    effectiveDate: 'March 1, 2026',
+    summary:
+      'Official terms governing restaurant merchant partnerships, payment processing, KYC verification, and automated bank settlements powered by Razorpay.',
+    sections: [
+      {
+        id: 'commercial-terms',
+        title: '1. Commercial Relationship',
+        content: `
+Craviti provides cloud software infrastructure for contactless ordering, kitchen display systems, and revenue reporting. Craviti acts as a technology enabler and does not manufacture food or operate food delivery fleets.
+        `,
+      },
+      {
+        id: 'merchant-payment-settlement',
+        title: '2. Merchant Payment & Settlement',
+        content: `
+To enable online customer payments and receive automated bank settlements, partner restaurants may be required to provide:
+- Permanent Account Number (PAN) of the entity or proprietor
+- Goods and Services Tax Identification Number (GSTIN), where applicable
+- Food Safety and Standards Authority of India (FSSAI) license registration
+- Commercial Bank Account Number & IFSC Code
+- Canceled Cheque or Bank Passbook copy for account validation
+- Know Your Customer (KYC) documentation for authorized signatories
+- Verified operational contact details and registered establishment address
+
+**Purpose of Collection:**
+These details are utilized strictly for merchant onboarding, compliance checks, statutory taxation requirements, and executing direct bank settlements via Razorpay.
+
+**Settlement Terms & Timelines:**
+Where applicable, customer payments captured through the digital menu are settled into the merchant's verified bank account via Razorpay.
+- Settlement timelines are managed directly by Razorpay.
+- For most domestic merchants, the standard settlement schedule is generally T+2 working days after successful payment capture.
+- Actual settlement timing may vary depending on:
+  • Merchant verification and KYC documentation status
+  • Banking holidays, weekend clearing cycles, and bank operating hours
+  • Reserve Bank of India (RBI) regulations and settlement directives
+  • Periodic risk assessments, fraud reviews, and compliance evaluations
+  • Razorpay applicable settlement schedule and merchant category terms
+
+Craviti facilitates order management and payment orchestration. Craviti does not hold merchant funds in escrow or guarantee fixed payout windows.
+        `,
+      },
+      {
+        id: 'sla-uptime',
+        title: '3. Service Level Agreement (SLA)',
+        content: `
+We commit to a 99.99% monthly platform uptime target for our core guest ordering and kitchen display services, excluding scheduled maintenance announced 48 hours in advance.
+        `,
+      },
+    ],
+  },
+  'payment-policy': {
+    title: 'Payment & Settlement Policy',
+    slug: 'payment-policy',
+    lastUpdated: 'March 1, 2026',
+    effectiveDate: 'March 1, 2026',
+    summary:
+      'Comprehensive policy detailing payment methods, security encryption, zero credential storage, Razorpay gateway integration, and merchant bank settlement schedules on the Craviti platform.',
+    sections: [
+      {
+        id: 'overview-gateway',
+        title: '1. Overview & Authorized Payment Gateway',
+        content: `
+Craviti securely processes customer payments using Razorpay Software Private Limited ("Razorpay"), one of India's trusted, RBI-authorized payment aggregators.
+
+Craviti provides the contactless menu and ordering orchestration interface that allows guests to place dining orders directly from their mobile browsers. All payment initiation, cryptographic authorization, fund capture, and bank payout operations are conducted in partnership with Razorpay under strict Indian banking and compliance standards.
+        `,
+      },
+      {
+        id: 'payment-methods',
+        title: '2. Supported Payment Methods',
+        content: `
+Craviti supports a broad range of convenient, contactless digital payment methods powered by Razorpay:
+- **Unified Payments Interface (UPI):** Google Pay, PhonePe, Paytm, BHIM, and all compliant UPI 2.0 applications.
+- **Credit Cards:** Visa, Mastercard, RuPay, and American Express.
+- **Debit Cards:** All domestic commercial and public sector bank debit cards.
+- **Internet Banking:** Over 50+ Indian commercial banking institutions.
+- **Digital Wallets & Prepaid Instruments:** Supported digital wallets and payment instruments enabled on the Razorpay gateway.
+- **Cash / Counter Payment:** Available where supported by the specific restaurant merchant for offline dining reconciliation.
+        `,
+      },
+      {
+        id: 'payment-security',
+        title: '3. Payment Security & Zero Credential Storage',
+        content: `
+Security is central to the Craviti platform. All communications between customer devices, restaurant terminals, and our servers utilize 256-bit TLS 1.3 encryption with HMAC-SHA256 verification.
+
+**Zero Sensitive Credential Storage Policy:**
+Craviti acts strictly as the digital ordering facilitation layer. **Craviti never stores:**
+- Credit or Debit Card Numbers (PAN)
+- Card Verification Value (CVV / CVC)
+- UPI PIN Numbers
+- Internet Banking Passwords
+- One-Time Passwords (OTPs)
+- Sensitive Financial or Banking Credentials
+
+All sensitive payment credentials are transmitted directly and securely to Razorpay using industry-standard tokenization in full compliance with PCI-DSS Level 1 specifications and Reserve Bank of India (RBI) data security mandates.
+        `,
+      },
+      {
+        id: 'settlement-policy',
+        title: '4. Merchant Settlement Policy & Timelines',
+        content: `
+Customer payments captured through the Craviti digital ordering interface are settled directly into the restaurant merchant's verified domestic bank account via Razorpay.
+
+**Key Settlement Guidelines:**
+- **Gateway Management:** Settlement timelines and payout schedules are managed directly by Razorpay.
+- **Standard Domestic Settlement:** For most domestic merchants, the standard settlement schedule is generally **T+2 working days** after successful payment capture.
+- **Settlement Timelines Notice:** Settlement timelines depend on Razorpay's applicable settlement schedule. Craviti does NOT promise or guarantee exact payout hours, daily cutoffs, or fixed turnaround guarantees (such as daily payouts or 48-hour guaranteed transfers).
+
+**Factors Influencing Settlement Timelines:**
+Actual settlement timing may vary based on:
+1. **Merchant Verification:** Completion of merchant KYC, active bank account validation, and compliance checks.
+2. **Banking Holidays & Weekends:** Non-working banking days, RBI clearing holidays, and bank operational schedules.
+3. **Regulatory Requirements:** Compliance with Reserve Bank of India (RBI) settlement directives and merchant guidelines.
+4. **Risk & Fraud Reviews:** Periodic risk assessments, abnormal transaction spikes, or fraud review holds.
+5. **Razorpay Policies:** Specific settlement schedules assigned by Razorpay according to merchant risk profile and category.
+        `,
+      },
+      {
+        id: 'invoicing-disputes',
+        title: '5. Invoicing, Taxes & Chargebacks',
+        content: `
+- **Tax Invoices & Receipts:** Upon successful payment capture, Craviti generates a timestamped digital invoice containing itemized menu selections, applicable GST breakdown (CGST/SGST/IGST), restaurant details, and transaction reference numbers.
+- **Chargebacks & Disputes:** Any chargeback requests or payment disputes filed with card-issuing banks or UPI providers are handled through Razorpay's standard dispute resolution procedures. Merchants are notified via the Craviti Admin & Restaurant portals to supply supporting order fulfillment records.
+        `,
+      },
+      {
+        id: 'faq',
+        title: '6. Frequently Asked Questions (FAQ)',
+        content: `
+**Q: How are payments processed?**
+Payments are processed securely through Razorpay, an RBI-authorized payment aggregator. Guests scan the table QR code, browse dishes, and initiate payment on mobile. Payment authorization triggers an automated cryptographic confirmation back to Craviti, instantaneously alerting the kitchen and billing counters.
+
+**Q: Does Craviti store my card details?**
+No. Craviti never stores sensitive card or banking credentials. We do not store card numbers, CVVs, UPI PINs, net banking passwords, or OTPs. All payment transactions and credential processing are encrypted end-to-end and handled securely by Razorpay.
+
+**Q: When does the restaurant receive payment?**
+Captured customer payments settle directly into the restaurant's verified domestic bank account via Razorpay. For most domestic merchants, the standard settlement schedule is generally T+2 working days after successful payment capture, subject to banking holidays, KYC status, and Razorpay settlement policies.
+
+**Q: Which payment methods are supported?**
+We support all major Indian digital payment modes including UPI (Google Pay, PhonePe, Paytm, BHIM), Credit Cards, Debit Cards, Net Banking across 50+ banks, and certified digital wallets.
+
+**Q: How are refunds processed?**
+Refunds are initiated following review and approval by the restaurant establishment. Once approved, the refund is processed securely through Razorpay directly back to the customer's original payment source. Refund completion timing depends on the customer's bank, payment method, and interbank clearing cycles.
         `,
       },
     ],
@@ -334,37 +598,6 @@ We conduct regular third-party penetration testing, static code analysis, and au
       },
     ],
   },
-  'merchant-agreement': {
-    title: 'Merchant Service Agreement',
-    slug: 'merchant-agreement',
-    lastUpdated: 'March 1, 2026',
-    effectiveDate: 'March 1, 2026',
-    summary:
-      'The definitive agreement between Craviti and hospitality merchants governing commercial terms, payout verification, platform SLAs, and operational obligations.',
-    sections: [
-      {
-        id: 'commercial-terms',
-        title: '1. Commercial Relationship',
-        content: `
-Craviti provides software-as-a-service infrastructure to empower independent restaurant operators. Craviti is not a restaurant, food delivery aggregator, or food manufacturer.
-        `,
-      },
-      {
-        id: 'bank-verification',
-        title: '2. Payout & Bank Verification Compliance',
-        content: `
-To receive online guest payouts, merchants must submit valid commercial bank credentials, an FSSAI registration certificate, and a canceled cheque. Our compliance team verifies records against national banking registers prior to payout activation.
-        `,
-      },
-      {
-        id: 'sla-uptime',
-        title: '3. Service Level Agreement (SLA)',
-        content: `
-We commit to a 99.99% monthly platform uptime target for our core guest ordering and kitchen display services, excluding scheduled maintenance announced 48 hours in advance.
-        `,
-      },
-    ],
-  },
   'customer-terms': {
     title: 'Customer Terms of Use',
     slug: 'customer-terms',
@@ -384,7 +617,7 @@ When you submit an order through the Craviti web interface at a partner establis
         id: 'payments-receipts',
         title: '2. Payment Settlement & Digital Receipts',
         content: `
-Online payments are processed securely through certified gateway partners. Upon completion of payment, a tamper-proof digital PDF receipt is generated with timestamped itemization and applicable GST details.
+Online payments are processed securely through certified gateway partner Razorpay. Upon completion of payment, a tamper-proof digital PDF receipt is generated with timestamped itemization and applicable GST details.
         `,
       },
     ],
@@ -462,4 +695,3 @@ Under the California Consumer Privacy Act (CCPA) and California Privacy Rights A
     ],
   },
 };
-

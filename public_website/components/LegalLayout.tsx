@@ -23,23 +23,34 @@ export const LEGAL_NAVIGATION = [
   { label: 'Privacy Policy', href: '/privacy-policy', slug: 'privacy-policy' },
   { label: 'Terms & Conditions', href: '/terms-and-conditions', slug: 'terms-and-conditions' },
   { label: 'Refund Policy', href: '/refund-policy', slug: 'refund-policy' },
-  { label: 'Cancellation Policy', href: '/cancellation-policy', slug: 'cancellation-policy' },
-  { label: 'Shipping & Delivery Policy', href: '/shipping-policy', slug: 'shipping-policy' },
+  { label: 'Merchant Terms', href: '/merchant-terms', slug: 'merchant-terms' },
+  { label: 'Payment Policy', href: '/payment-policy', slug: 'payment-policy' },
   { label: 'Cookie Policy', href: '/cookie-policy', slug: 'cookie-policy' },
-  { label: 'Disclaimer', href: '/disclaimer', slug: 'disclaimer' },
-  { label: 'Security Policy', href: '/security-policy', slug: 'security-policy' },
+  { label: 'Cancellation Policy', href: '/cancellation-policy', slug: 'cancellation-policy' },
+  { label: 'Contact Legal', href: '/contact', slug: 'contact' },
+  { label: 'Shipping & Delivery Policy', href: '/shipping-policy', slug: 'shipping-policy' },
   { label: 'Merchant Agreement', href: '/merchant-agreement', slug: 'merchant-agreement' },
   { label: 'Customer Terms', href: '/customer-terms', slug: 'customer-terms' },
+  { label: 'Security Policy', href: '/security-policy', slug: 'security-policy' },
   { label: 'Data Processing (DPA)', href: '/data-processing-agreement', slug: 'data-processing-agreement' },
   { label: 'Acceptable Use Policy', href: '/acceptable-use-policy', slug: 'acceptable-use-policy' },
+  { label: 'Disclaimer', href: '/disclaimer', slug: 'disclaimer' },
   { label: 'GDPR Compliance', href: '/gdpr', slug: 'gdpr' },
   { label: 'CCPA Privacy', href: '/ccpa', slug: 'ccpa' },
-  { label: 'Contact & Legal', href: '/contact', slug: 'contact' },
 ];
 
 export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
   const router = useRouter();
   const pathname = usePathname();
+
+  const isItemActive = (item: (typeof LEGAL_NAVIGATION)[0]) => {
+    return (
+      pathname === item.href ||
+      pathname === `${item.href}/` ||
+      document.slug === item.slug ||
+      (item.slug === 'merchant-terms' && (pathname === '/merchant-agreement' || document.slug === 'merchant-agreement'))
+    );
+  };
 
   return (
     <div className="pt-28 pb-20 bg-slate-50/50 min-h-screen">
@@ -124,7 +135,7 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
                 Legal Pages ▼
               </option>
               {LEGAL_NAVIGATION.map((item) => {
-                const isActive = pathname === item.href || document.slug === item.slug;
+                const isActive = isItemActive(item);
                 return (
                   <option key={item.href} value={item.href}>
                     📄 {item.label} {isActive ? '← Active' : ''}
@@ -180,7 +191,7 @@ export const LegalLayout: React.FC<LegalLayoutProps> = ({ document }) => {
               {/* Legal Documents Links */}
               <nav className="space-y-1">
                 {LEGAL_NAVIGATION.map((item) => {
-                  const isActive = pathname === item.href || document.slug === item.slug;
+                  const isActive = isItemActive(item);
                   return (
                     <Link
                       key={item.href}
