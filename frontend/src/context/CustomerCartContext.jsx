@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { safeNumber } from '../utils/formatters';
 
 const CustomerCartContext = createContext(null);
@@ -21,7 +21,7 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
     }
   }, [cart, storageKey]);
 
-  const addToCart = (item, quantity = 1, specialInstructions = '') => {
+  const addToCart = useCallback((item, quantity = 1, specialInstructions = '') => {
     if (!item?._id) return;
 
     setCart((prev) => {
@@ -34,7 +34,10 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
 
       if (existingIndex > -1) {
         const next = [...prev];
-        next[existingIndex].quantity = safeNumber(next[existingIndex].quantity) + quantity;
+        next[existingIndex] = {
+          ...next[existingIndex],
+          quantity: safeNumber(next[existingIndex].quantity) + quantity,
+        };
         return next;
       }
 
@@ -53,42 +56,50 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
         },
       ];
     });
-  };
+  }, []);
 
-  const updateQuantity = (menuItemId, quantity) => {
+  const updateQuantity = useCallback((menuItemId, quantity) => {
     const q = safeNumber(quantity);
     if (q <= 0) {
-      removeFromCart(menuItemId);
+      setCart((prev) => prev.filter((i) => i.menuItemId !== menuItemId));
       return;
     }
     setCart((prev) =>
       prev.map((i) => (i.menuItemId === menuItemId ? { ...i, quantity: q } : i))
     );
-  };
+  }, []);
 
-  const removeFromCart = (menuItemId) => {
+  const removeFromCart = useCallback((menuItemId) => {
     setCart((prev) => prev.filter((i) => i.menuItemId !== menuItemId));
-  };
+  }, []);
 
-  const clearCart = () => {
+  const clearCart = useCallback(() => {
     setCart([]);
     try {
       localStorage.removeItem(storageKey);
     } catch {
       /* ignore */
     }
-  };
+  }, [storageKey]);
 
-  const getItemQuantity = (menuItemId) => {
-    const item = (cart || []).find((i) => i.menuItemId === menuItemId);
-    return item ? safeNumber(item.quantity) : 0;
-  };
+  // Fast O(1) quantity lookup map
+  const quantityMap = useMemo(() => {
+    const map = new Map();
+    for (const item of cart) {
+      map.set(item.menuItemId, safeNumber(item.quantity));
+    }
+    return map;
+  }, [cart]);
+
+  const getItemQuantity = useCallback((menuItemId) => {
+    return quantityMap.get(menuItemId) || 0;
+  }, [quantityMap]);
 
   /**
    * Reconciles cart items against latest live production menu items
    * Removes deleted/out-of-stock items, updates live prices and images
    */
-  const syncCartWithLiveMenu = (liveMenuItems = []) => {
+  const syncCartWithLiveMenu = useCallback((liveMenuItems = []) => {
     if (!Array.isArray(liveMenuItems) || liveMenuItems.length === 0) return;
     const liveMap = new Map(liveMenuItems.map((item) => [String(item._id), item]));
 
@@ -131,39 +142,66 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
 
       return changed ? updatedCart : prevCart;
     });
-  };
+  }, []);
 
-  const safeCart = Array.isArray(cart) ? cart : [];
-  const totalCount = safeCart.reduce((sum, item) => sum + safeNumber(item.quantity), 0);
+  const safeCart = useMemo(() => (Array.isArray(cart) ? cart : []), [cart]);
 
-  const subtotal = safeCart.reduce(
-    (sum, item) => sum + safeNumber(item.price) * safeNumber(item.quantity),
-    0
+  const totalCount = useMemo(
+    () => safeCart.reduce((sum, item) => sum + safeNumber(item.quantity), 0),
+    [safeCart]
   );
 
-  const grandTotal = safeCart.reduce(
-    (sum, item) => sum + safeNumber(item.sellingPrice) * safeNumber(item.quantity),
-    0
+  const subtotal = useMemo(
+    () =>
+      safeCart.reduce(
+        (sum, item) => sum + safeNumber(item.price) * safeNumber(item.quantity),
+        0
+      ),
+    [safeCart]
   );
 
-  const discount = Math.max(0, subtotal - grandTotal);
+  const grandTotal = useMemo(
+    () =>
+      safeCart.reduce(
+        (sum, item) => sum + safeNumber(item.sellingPrice) * safeNumber(item.quantity),
+        0
+      ),
+    [safeCart]
+  );
+
+  const discount = useMemo(() => Math.max(0, subtotal - grandTotal), [subtotal, grandTotal]);
+
+  const contextValue = useMemo(
+    () => ({
+      cart: safeCart,
+      addToCart,
+      updateQuantity,
+      removeFromCart,
+      clearCart,
+      getItemQuantity,
+      syncCartWithLiveMenu,
+      totalCount,
+      subtotal,
+      discount,
+      grandTotal,
+    }),
+    [
+      safeCart,
+      addToCart,
+      updateQuantity,
+      removeFromCart,
+      clearCart,
+      getItemQuantity,
+      syncCartWithLiveMenu,
+      totalCount,
+      subtotal,
+      discount,
+      grandTotal,
+    ]
+  );
 
   return (
-    <CustomerCartContext.Provider
-      value={{
-        cart: safeCart,
-        addToCart,
-        updateQuantity,
-        removeFromCart,
-        clearCart,
-        getItemQuantity,
-        syncCartWithLiveMenu,
-        totalCount,
-        subtotal,
-        discount,
-        grandTotal,
-      }}
-    >
+    <CustomerCartContext.Provider value={contextValue}>
       {children}
     </CustomerCartContext.Provider>
   );

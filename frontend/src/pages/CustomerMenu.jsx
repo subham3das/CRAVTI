@@ -14,7 +14,6 @@ import {
   FiArrowRight,
   FiMapPin,
   FiPlus,
-  FiCheck,
 } from 'react-icons/fi';
 import { MdQrCodeScanner, MdRestaurantMenu } from 'react-icons/md';
 import { fetchCustomerMenuApi, placeCustomerOrderApi } from '../services/orderService';
@@ -75,9 +74,19 @@ const CustomerMenuContent = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [placedOrder, setPlacedOrder] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [stickyPaymentMethod, setStickyPaymentMethod] = useState('cash');
 
   // Category refs for smooth scrolling
   const categorySectionRefs = useRef({});
+
+  // Prevent duplicate double submission ref
+  const isSubmittingRef = useRef(false);
+
+  // Keep a stable ref for syncCartWithLiveMenu to prevent loadMenu recreating on cart changes
+  const syncCartRef = useRef(syncCartWithLiveMenu);
+  useEffect(() => {
+    syncCartRef.current = syncCartWithLiveMenu;
+  }, [syncCartWithLiveMenu]);
 
   // 1. Offline Network Listener
   useEffect(() => {
@@ -127,8 +136,8 @@ const CustomerMenuContent = () => {
             setActiveOrder(activeOrderData);
           }
           // Live sync cart items with latest prices and availability
-          if (typeof syncCartWithLiveMenu === 'function') {
-            syncCartWithLiveMenu(liveItems);
+          if (typeof syncCartRef.current === 'function') {
+            syncCartRef.current(liveItems);
           }
         }
       } catch (err) {
@@ -142,7 +151,7 @@ const CustomerMenuContent = () => {
         if (!isSilent) setLoading(false);
       }
     },
-    [restaurantSlug, activeTable, activeToken, syncCartWithLiveMenu]
+    [restaurantSlug, activeTable, activeToken]
   );
 
   useEffect(() => {
@@ -179,20 +188,45 @@ const CustomerMenuContent = () => {
     socket.on('restaurant.settings.updated', handleMenuSync);
 
     return () => {
+      socket.off('menu.updated', handleMenuSync);
+      socket.off('menu-updated', handleMenuSync);
+      socket.off('category.updated', handleMenuSync);
+      socket.off('category-updated', handleMenuSync);
+      socket.off('restaurant.updated', handleMenuSync);
+      socket.off('restaurant.settings.updated', handleMenuSync);
       socket.disconnect();
     };
   }, [restaurant?._id, restaurantSlug, table?._id, loadMenu]);
 
-  // 3. Filtered items based on search and category
+  // Memoized Item Event Handlers to prevent re-rendering unaffected menu cards
+  const handleAddToCart = useCallback(
+    (item) => {
+      addToCart(item, 1);
+    },
+    [addToCart]
+  );
+
+  const handleUpdateQuantity = useCallback(
+    (itemId, qty) => {
+      updateQuantity(itemId, qty);
+    },
+    [updateQuantity]
+  );
+
+  const handleOpenModal = useCallback((item) => {
+    setSelectedItem(item);
+  }, []);
+
+  // Filtered menu items
   const filteredItems = useMemo(() => {
-    let list = menuItems;
+    let list = Array.isArray(menuItems) ? menuItems : [];
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (i) =>
-          i.itemName.toLowerCase().includes(q) ||
-          (i.description && i.description.toLowerCase().includes(q))
+          i.itemName?.toLowerCase().includes(q) ||
+          i.description?.toLowerCase().includes(q)
       );
     }
 
@@ -210,7 +244,7 @@ const CustomerMenuContent = () => {
 
   // Popular items
   const popularItems = useMemo(() => {
-    return menuItems.filter((i) => i.popular || i.recommended).slice(0, 5);
+    return (Array.isArray(menuItems) ? menuItems : []).filter((i) => i.popular || i.recommended).slice(0, 5);
   }, [menuItems]);
 
   // Items grouped by category
@@ -230,7 +264,7 @@ const CustomerMenuContent = () => {
     const otherKey = 'other';
     groups[otherKey] = { categoryName: 'Specialties', items: [] };
 
-    for (const item of menuItems) {
+    for (const item of (Array.isArray(menuItems) ? menuItems : [])) {
       const catId = item.categoryId?._id || item.categoryId || otherKey;
       if (groups[catId]) {
         groups[catId].items.push(item);
@@ -260,14 +294,109 @@ const CustomerMenuContent = () => {
     }
   };
 
-  // Place Order handler (reuses active order if active)
-  const handlePlaceOrder = async ({ customerName, customerPhone, paymentMethod }) => {
+  // Tax calculations
+  const taxPercent = useMemo(() => {
+    if (settings?.gstEnabled === false) return 0;
+    return Number(settings?.gstPercentage) || 0;
+  }, [settings]);
+
+  const taxAmount = useMemo(() => {
+    if (taxPercent <= 0) return 0;
+    return Math.round(grandTotal * (taxPercent / 100) * 100) / 100;
+  }, [grandTotal, taxPercent]);
+
+  const calculatedGrandTotal = useMemo(() => {
+    return Math.round((grandTotal + taxAmount) * 100) / 100;
+  }, [grandTotal, taxAmount]);
+
+  // Robust Order Placement with Idempotent Prepay and Cash Flows
+  const handlePlaceOrder = async ({ customerName, customerPhone, paymentMethod = 'cash' }) => {
+    if (isSubmittingRef.current || isPlacingOrder) return;
+    if (!cart || cart.length === 0) {
+      toast.error('Your cart is empty');
+      return;
+    }
+
     try {
+      isSubmittingRef.current = true;
       setIsPlacingOrder(true);
+
       const guestId = getOrCreateGuestId();
       const deviceId = getOrCreateDeviceId();
       const sessionId = getOrCreateSessionId();
 
+      const itemsPayload = cart.map((i) => ({
+        menuItemId: i.menuItemId,
+        quantity: i.quantity,
+        specialInstructions: i.specialInstructions || '',
+      }));
+
+      // FLOW A: ONLINE PAYMENT (PREPAY)
+      // Generates Razorpay Order first without DB order.
+      // Order created in DB ONLY after successful HMAC signature verification.
+      // If cancelled or failed: Cart is 100% preserved, no order created.
+      if (paymentMethod === 'online') {
+        const payRes = await createPaymentOrderApi({
+          restaurantSlug,
+          tableIdentifier: activeTable,
+          guestId,
+          deviceId,
+          guestSessionId: sessionId,
+          customerName: customerName || 'Guest',
+          customerPhone: customerPhone || '',
+          customerEmail: '',
+          items: itemsPayload,
+        });
+
+        if (!payRes.success || !payRes.data) {
+          throw new Error(payRes.message || 'Failed to initialize payment gateway.');
+        }
+
+        await openRazorpayModal({
+          orderData: payRes.data,
+          onSuccess: async (verifyPayload) => {
+            try {
+              const vRes = await verifyPaymentApi({
+                razorpayOrderId: payRes.data.razorpayOrderId,
+                ...verifyPayload,
+              });
+
+              if (vRes.success && vRes.order) {
+                clearCart();
+                setIsCartOpen(false);
+                setActiveOrder(vRes.order);
+                setPlacedOrder(vRes.order);
+                toast.success('Payment verified! Your order has been placed.');
+                navigate(`/order/track/${vRes.order._id}`);
+              } else {
+                toast.error(vRes.message || 'Payment verification failed.');
+              }
+            } catch (vErr) {
+              const errMsg = vErr.response?.data?.message || 'Payment verification failed.';
+              toast.error(errMsg);
+            } finally {
+              setIsPlacingOrder(false);
+              isSubmittingRef.current = false;
+            }
+          },
+          onDismiss: () => {
+            // Cart preserved!
+            setIsPlacingOrder(false);
+            isSubmittingRef.current = false;
+            toast('Payment cancelled. Your cart has been preserved.', { icon: '🛒' });
+          },
+          onError: (pErr) => {
+            // Cart preserved!
+            setIsPlacingOrder(false);
+            isSubmittingRef.current = false;
+            toast.error(pErr.message || 'Payment failed. No order was placed.');
+          },
+        });
+        return;
+      }
+
+      // FLOW B: CASH PAYMENT (POSTPAY)
+      // Places order immediately with status: placed, paymentStatus: pending, cashierStatus: unpaid
       const orderPayload = {
         restaurantSlug,
         tableIdentifier: activeTable,
@@ -276,12 +405,8 @@ const CustomerMenuContent = () => {
         sessionId,
         customerName: customerName || 'Guest',
         customerPhone: customerPhone || '',
-        paymentMethod: paymentMethod || 'cash',
-        items: cart.map((i) => ({
-          menuItemId: i.menuItemId,
-          quantity: i.quantity,
-          specialInstructions: i.specialInstructions,
-        })),
+        paymentMethod: 'cash',
+        items: itemsPayload,
       };
 
       const res = await placeCustomerOrderApi(orderPayload);
@@ -291,63 +416,18 @@ const CustomerMenuContent = () => {
         setIsCartOpen(false);
         setActiveOrder(res.order);
         setPlacedOrder(res.order);
-
-        // Phase 5: Razorpay Checkout flow if customer selected Online Payment
-        if (paymentMethod === 'online') {
-          try {
-            const payRes = await createPaymentOrderApi({
-              orderId: res.order._id,
-              customerEmail: '',
-              customerPhone: customerPhone || '',
-              guestSessionId: sessionId,
-            });
-
-            if (payRes.success && payRes.data) {
-              await openRazorpayModal({
-                orderData: payRes.data,
-                onSuccess: async (verifyPayload) => {
-                  try {
-                    const vRes = await verifyPaymentApi({
-                      orderId: res.order._id,
-                      ...verifyPayload,
-                    });
-                    if (vRes.success) {
-                      toast.success('Payment verified successfully! Receipt ready.');
-                      navigate(`/order/track/${res.order._id}`);
-                    }
-                  } catch (vErr) {
-                    toast.error(vErr.response?.data?.message || 'Payment verification failed.');
-                    navigate(`/order/track/${res.order._id}`);
-                  }
-                },
-                onDismiss: () => {
-                  toast('Online payment window closed. You can pay anytime from your order tracking screen.', { icon: 'ℹ️' });
-                  navigate(`/order/track/${res.order._id}`);
-                },
-                onError: (err) => {
-                  toast.error(err.message || 'Payment initiation error.');
-                  navigate(`/order/track/${res.order._id}`);
-                },
-              });
-              return;
-            }
-          } catch (payErr) {
-            console.warn('[Razorpay] Gateway note:', payErr.message);
-            toast('Order placed! Pay online from tracking page or pay cash on counter.', { icon: '💳' });
-            navigate(`/order/track/${res.order._id}`);
-            return;
-          }
-        }
-
-        if (res.appended) {
-          toast.success('Additional items appended to your active bill!');
-        }
+        toast.success(res.appended ? 'Items added to your active bill!' : 'Order placed successfully! Pay at counter.');
+      } else {
+        throw new Error(res.message || 'Failed to place cash order.');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to place order. Please try again.';
+      const msg = err.response?.data?.message || err.message || 'Failed to place order. Please try again.';
       toast.error(msg);
     } finally {
-      setIsPlacingOrder(false);
+      if (paymentMethod !== 'online') {
+        setIsPlacingOrder(false);
+        isSubmittingRef.current = false;
+      }
     }
   };
 
@@ -408,58 +488,25 @@ const CustomerMenuContent = () => {
     );
   }
 
-  // Order Locked State (After Served)
-  if (isOrderLocked && activeOrder) {
+  // Order Locked / Bill Requested State
+  if (isOrderLocked || waitingForPayment) {
     return (
       <div className="max-w-md mx-auto min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3">
-          <FiCheck className="w-8 h-8" />
+        <div className="w-16 h-16 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center mb-3">
+          <FiClock className="w-8 h-8" />
         </div>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100/70 px-2.5 py-1 rounded-full">
-          Order Locked
-        </span>
-        <h3 className="font-extrabold text-slate-900 text-lg mt-2">
-          Your previous order has already been served.
-        </h3>
+        <h3 className="font-extrabold text-slate-900 text-lg">Bill Requested / Table Locked</h3>
         <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
-          Order <strong>#{activeOrder.orderNumber}</strong> (Table {table?.tableNumber || activeTable}) is served and locked. No new items can be added to this bill.
+          Your table bill has been requested or is awaiting settlement. Further ordering from this device is paused.
         </p>
-
-        <div className="bg-white border border-slate-200 rounded-2xl p-4 my-5 w-full max-w-xs text-left text-xs space-y-2 shadow-2xs">
-          <div className="flex justify-between">
-            <span className="text-slate-400">Total Bill:</span>
-            <span className="font-extrabold text-slate-900">{formatCurrency(activeOrder.grandTotal)}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-slate-400">Payment Status:</span>
-            <span className={`font-bold capitalize ${waitingForPayment ? 'text-amber-600' : 'text-emerald-600'}`}>
-              {waitingForPayment ? 'Waiting for payment' : 'Paid'}
-            </span>
-          </div>
-        </div>
-
-        <div className="space-y-2.5 w-full max-w-xs">
+        {activeOrder && (
           <button
             onClick={() => navigate(`/order/track/${activeOrder._id}`)}
-            className="w-full py-3.5 px-4 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-xs shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2"
+            className="mt-5 px-5 py-2.5 rounded-xl bg-[#16A34A] text-white font-bold text-xs shadow-md"
           >
-            <span>{waitingForPayment ? 'View Bill / Settle Payment' : 'View Completed Order'}</span>
-            <FiArrowRight className="w-4 h-4" />
+            Track Order & Settle Bill
           </button>
-
-          {!waitingForPayment && (
-            <button
-              onClick={() => {
-                setIsOrderLocked(false);
-                setActiveOrder(null);
-                window.location.reload();
-              }}
-              className="w-full py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs"
-            >
-              Start New Order
-            </button>
-          )}
-        </div>
+        )}
       </div>
     );
   }
@@ -471,12 +518,9 @@ const CustomerMenuContent = () => {
         <div className="w-16 h-16 rounded-full bg-rose-50 text-rose-500 flex items-center justify-center mb-3">
           <FiAlertCircle className="w-8 h-8" />
         </div>
-        <h3 className="font-bold text-slate-900 text-base">Unable to load menu.</h3>
-        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">
-          {error || 'Please try again.'}
-        </p>
+        <h3 className="font-extrabold text-slate-900 text-lg">Menu Unavailable</h3>
+        <p className="text-xs text-slate-500 max-w-xs mt-1 leading-relaxed">{error}</p>
         <button
-          type="button"
           onClick={() => loadMenu(false)}
           className="mt-6 px-6 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-bold text-xs shadow-md active:scale-95 transition-all cursor-pointer"
         >
@@ -620,8 +664,8 @@ const CustomerMenuContent = () => {
         </div>
       )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-4 pb-8 space-y-6 w-full overflow-x-hidden">
+      {/* Main Content Area with Adaptive Clearance for Persistent Sticky Bottom Checkout Bar */}
+      <main className={`flex-1 p-4 ${totalCount > 0 ? 'pb-44 sm:pb-36' : 'pb-8'} space-y-6 w-full overflow-x-hidden`}>
         {menuItems.length === 0 ? (
           <div className="py-20 text-center px-4 space-y-3">
             <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-[#16A34A] border border-emerald-100 flex items-center justify-center mx-auto shadow-2xs">
@@ -657,9 +701,10 @@ const CustomerMenuContent = () => {
                       key={item._id}
                       item={item}
                       quantity={getItemQuantity(item._id)}
-                      onAdd={() => addToCart(item, 1)}
-                      onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                      onOpenModal={() => setSelectedItem(item)}
+                      disabled={isPlacingOrder}
+                      onAdd={handleAddToCart}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onOpenModal={handleOpenModal}
                     />
                   ))}
                 </div>
@@ -687,9 +732,10 @@ const CustomerMenuContent = () => {
                         key={item._id}
                         item={item}
                         quantity={getItemQuantity(item._id)}
-                        onAdd={() => addToCart(item, 1)}
-                        onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                        onOpenModal={() => setSelectedItem(item)}
+                        disabled={isPlacingOrder}
+                        onAdd={handleAddToCart}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onOpenModal={handleOpenModal}
                       />
                     ))}
                   </div>
@@ -717,9 +763,10 @@ const CustomerMenuContent = () => {
                         key={item._id}
                         item={item}
                         quantity={getItemQuantity(item._id)}
-                        onAdd={() => addToCart(item, 1)}
-                        onUpdateQuantity={(qty) => updateQuantity(item._id, qty)}
-                        onOpenModal={() => setSelectedItem(item)}
+                        disabled={isPlacingOrder}
+                        onAdd={handleAddToCart}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onOpenModal={handleOpenModal}
                       />
                     ))}
                   </div>
@@ -731,41 +778,113 @@ const CustomerMenuContent = () => {
       </main>
 
       {/* Craviti Customer Ordering Footer with Adaptive Clearance for Sticky Cart */}
-      <CustomerFooter className={`w-full ${totalCount > 0 ? 'pb-28 sm:pb-24' : 'pb-10'}`} />
+      <CustomerFooter className={`w-full ${totalCount > 0 ? 'pb-36 sm:pb-28' : 'pb-10'}`} />
 
-      {/* Sticky Bottom Cart Bar */}
+      {/* Persistent Sticky Bottom Checkout Section (Always Visible During Browsing) */}
       <AnimatePresence>
         {totalCount > 0 && (
           <motion.div
-            initial={{ y: 80, opacity: 0 }}
+            initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 80, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-            className="sticky bottom-0 left-0 right-0 z-40 w-full bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-2xl px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]"
           >
-            <div className="max-w-md sm:max-w-2xl md:max-w-4xl xl:max-w-6xl mx-auto flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-[#16A34A] text-white flex items-center justify-center font-black text-sm shadow-sm shrink-0">
-                  {totalCount}
+            <div className="max-w-md sm:max-w-2xl md:max-w-4xl xl:max-w-6xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Left/Top: Items, Breakdown & Payment Selector */}
+              <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#16A34A] text-white flex items-center justify-center font-black text-sm shadow-sm shrink-0">
+                    {totalCount}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-800">
+                        {totalCount} {totalCount === 1 ? 'item' : 'items'}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        ({formatCurrency(subtotal)})
+                      </span>
+                    </div>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-base font-black text-slate-900 leading-tight">
+                        {formatCurrency(calculatedGrandTotal)}
+                      </span>
+                      {taxPercent > 0 && (
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          incl. {taxPercent}% GST
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-left min-w-0">
-                  <p className="text-[10px] uppercase font-semibold text-slate-400 leading-none truncate">
-                    Table {table?.tableNumber || activeTable} • {totalCount} {totalCount === 1 ? 'item' : 'items'}
-                  </p>
-                  <p className="text-base font-extrabold text-slate-900 leading-tight mt-0.5 truncate">
-                    {formatCurrency(grandTotal)}
-                  </p>
+
+                {/* Quick Payment Method Selector */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0 ml-auto sm:ml-4">
+                  <button
+                    type="button"
+                    disabled={isPlacingOrder}
+                    onClick={() => setStickyPaymentMethod('cash')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                      stickyPaymentMethod === 'cash'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    💵 Cash
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPlacingOrder}
+                    onClick={() => setStickyPaymentMethod('online')}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                      stickyPaymentMethod === 'online'
+                        ? 'bg-[#16A34A] text-white shadow-2xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    💳 Online
+                  </button>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsCartOpen(true)}
-                className="bg-[#16A34A] hover:bg-[#15803d] text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-emerald-600/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer shrink-0"
-              >
-                <span>View Cart</span>
-                <FiArrowRight className="w-4 h-4" />
-              </button>
+              {/* Right/Bottom: View Details Drawer & Place Order CTA */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  disabled={isPlacingOrder}
+                  onClick={() => setIsCartOpen(true)}
+                  className="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <FiShoppingBag className="w-3.5 h-3.5" />
+                  <span>View Details</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isPlacingOrder}
+                  onClick={() => {
+                    handlePlaceOrder({
+                      paymentMethod: stickyPaymentMethod,
+                    });
+                  }}
+                  className="flex-1 sm:flex-initial py-2.5 px-6 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-extrabold text-xs shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer disabled:opacity-60 disabled:pointer-events-none"
+                >
+                  {isPlacingOrder ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin shrink-0" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        {stickyPaymentMethod === 'cash' ? 'Place Order (Cash)' : 'Pay Online & Order'}
+                      </span>
+                      <FiArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -794,6 +913,7 @@ const CustomerMenuContent = () => {
         restaurantName={restaurant?.restaurantName || 'Restaurant'}
         isPlacingOrder={isPlacingOrder}
         hasActiveOrder={Boolean(activeOrder)}
+        initialPaymentMethod={stickyPaymentMethod}
       />
 
       {/* Order Placed Success Modal */}
@@ -810,7 +930,7 @@ const CustomerMenuContent = () => {
         }}
       />
 
-      {/* QR Active Order Session Prompt (Requirement 3: QR Behavior Improvement) */}
+      {/* QR Active Order Session Prompt */}
       <AnimatePresence>
         {activeOrder && !dismissActivePrompt && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -900,3 +1020,5 @@ export const CustomerMenu = () => {
     </CustomerCartProvider>
   );
 };
+
+export default CustomerMenu;

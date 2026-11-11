@@ -4,9 +4,14 @@ import env from '../config/env.js';
 import { Payment } from '../models/Payment.js';
 import { Order } from '../models/Order.js';
 import { Restaurant } from '../models/Restaurant.js';
+import { Table } from '../models/Table.js';
+import { MenuItem } from '../models/MenuItem.js';
+import { RestaurantSettings } from '../models/RestaurantSettings.js';
+import { GuestSession } from '../models/GuestSession.js';
 import { FeatureFlags } from '../models/FeatureFlags.js';
+import { getNextOrderNumber } from '../models/Counter.js';
 import { generateReceiptSnapshot } from './orderService.js';
-import { emitSyncEvent, emitToOrder } from '../config/socket.js';
+import { emitSyncEvent, emitToOrder, emitToRestaurant, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { createRestaurantNotification, createAdminNotification } from './notificationService.js';
 
@@ -23,26 +28,193 @@ const safeCompare = (a, b) => {
 
 /**
  * 1. Create Razorpay Payment Order
- * Checks feature flags, restaurant payment enabled, and initializes order with Razorpay.
+ * Supports both:
+ *  - Existing active order (paying bill online via orderId)
+ *  - PREPAY FLOW (diner paying upfront before order creation via items & restaurantSlug)
  */
 export const createPaymentOrderService = async ({
   orderId,
   customerEmail = '',
   customerPhone = '',
   guestSessionId = '',
+  // Prepay payload fields:
+  restaurantSlug,
+  tableIdentifier,
+  guestId,
+  deviceId,
+  sessionId,
+  customerName,
+  items,
 }) => {
-  const order = await Order.findById(orderId);
-  if (!order || order.isDeleted) {
-    const error = new Error('Order not found or has been cancelled.');
-    error.statusCode = 404;
-    throw error;
-  }
+  let order = null;
+  let restaurant = null;
+  let table = null;
+  let grandTotal = 0;
+  let amountInPaise = 0;
+  let receiptIdentifier = '';
+  let prepayPayload = null;
 
-  const restaurant = await Restaurant.findById(order.restaurantId);
-  if (!restaurant || restaurant.isDeleted) {
-    const error = new Error('Restaurant not found or is currently suspended.');
-    error.statusCode = 404;
-    throw error;
+  if (orderId) {
+    order = await Order.findById(orderId);
+    if (!order || order.isDeleted) {
+      const error = new Error('Order not found or has been cancelled.');
+      error.statusCode = 404;
+      throw error;
+    }
+    restaurant = await Restaurant.findById(order.restaurantId);
+    if (!restaurant || restaurant.isDeleted) {
+      const error = new Error('Restaurant not found or is currently suspended.');
+      error.statusCode = 404;
+      throw error;
+    }
+    grandTotal = order.grandTotal;
+    amountInPaise = Math.max(100, Math.round(order.grandTotal * 100));
+    receiptIdentifier = order.orderNumber;
+  } else {
+    // PREPAY FLOW (Order NOT created yet)
+    if (!restaurantSlug) {
+      const error = new Error('Restaurant slug is required for payment initialization');
+      error.statusCode = 400;
+      throw error;
+    }
+    if (!items || !items.length) {
+      const error = new Error('Cart items are required for payment initialization');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    restaurant = await Restaurant.findOne({ slug: restaurantSlug.toLowerCase() });
+    if (!restaurant || restaurant.isDeleted) {
+      const error = new Error('Restaurant not found or is currently suspended.');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Operational status validation
+    let settings = await RestaurantSettings.findOne({ restaurantId: restaurant._id }).lean();
+    if (settings?.restaurantStatus === 'closed') {
+      const error = new Error('Restaurant is currently closed and not accepting orders.');
+      error.statusCode = 403;
+      throw error;
+    }
+    if (settings?.restaurantStatus === 'pause_orders' || settings?.acceptOrders === false) {
+      const error = new Error('Restaurant has temporarily paused taking orders.');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    // Resolve Table
+    let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
+    const parsedNum = parseInt(tableIdentifier, 10);
+    if (!isNaN(parsedNum)) {
+      tableQuery.tableNumber = parsedNum;
+    } else if (tableIdentifier) {
+      tableQuery._id = tableIdentifier;
+    }
+    table = await Table.findOne(tableQuery);
+    if (!table) {
+      const error = new Error('Table not found');
+      error.statusCode = 404;
+      throw error;
+    }
+    if (!table.isActive || table.status === 'disabled') {
+      const error = new Error('This table is currently disabled for ordering');
+      error.statusCode = 403;
+      throw error;
+    }
+
+    // Validate items against DB
+    const itemIds = items.map((i) => i.menuItemId || i.itemId);
+    const dbItems = await MenuItem.find({
+      _id: { $in: itemIds },
+      restaurantId: restaurant._id,
+      isDeleted: { $ne: true },
+    }).lean();
+
+    const dbItemMap = new Map(dbItems.map((item) => [item._id.toString(), item]));
+    const validatedNewItems = [];
+    let maxPrepTime = settings?.estimatedPreparationTime || 15;
+    let subtotal = 0;
+    let totalDiscount = 0;
+
+    for (const requestedItem of items) {
+      const idKey = (requestedItem.menuItemId || requestedItem.itemId || '').toString();
+      const dbItem = dbItemMap.get(idKey);
+      if (!dbItem) {
+        const error = new Error(`Item "${requestedItem.name || 'Dish'}" is no longer on the menu`);
+        error.statusCode = 400;
+        throw error;
+      }
+      if (dbItem.availability === 'out_of_stock') {
+        const error = new Error(`"${dbItem.itemName}" is currently out of stock`);
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const qty = Math.max(1, parseInt(requestedItem.quantity, 10) || 1);
+      const originalPrice = Number(dbItem.price) || 0;
+      const sellingPrice = Number(dbItem.sellingPrice) || originalPrice;
+
+      if (dbItem.preparationTime && dbItem.preparationTime > maxPrepTime) {
+        maxPrepTime = dbItem.preparationTime;
+      }
+
+      validatedNewItems.push({
+        itemId: dbItem._id,
+        menuItemId: dbItem._id,
+        itemName: dbItem.itemName,
+        name: dbItem.itemName,
+        originalPrice,
+        price: originalPrice,
+        sellingPrice,
+        quantity: qty,
+        specialInstructions: requestedItem.specialInstructions?.trim() || '',
+        image: dbItem.image?.url || '',
+        foodType: dbItem.foodType || 'veg',
+      });
+
+      subtotal += originalPrice * qty;
+      totalDiscount += (originalPrice - sellingPrice) * qty;
+    }
+
+    subtotal = Math.round(subtotal * 100) / 100;
+    totalDiscount = Math.round(totalDiscount * 100) / 100;
+    const taxableAmount = Math.max(0, subtotal - totalDiscount);
+
+    const gstPercent = (settings?.gstEnabled !== false) ? (Number(settings?.gstPercentage) || 0) : 0;
+    const tax = Math.round(taxableAmount * (gstPercent / 100) * 100) / 100;
+
+    let serviceCharge = 0;
+    if (settings?.serviceChargeEnabled) {
+      if (settings.serviceChargeType === 'percentage') {
+        serviceCharge = Math.round(taxableAmount * ((Number(settings.serviceChargeValue) || 0) / 100) * 100) / 100;
+      } else {
+        serviceCharge = Math.round((Number(settings.serviceChargeValue) || 0) * 100) / 100;
+      }
+    }
+
+    grandTotal = Math.round((taxableAmount + tax + serviceCharge) * 100) / 100;
+    amountInPaise = Math.max(100, Math.round(grandTotal * 100));
+    receiptIdentifier = `prepay_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+
+    prepayPayload = {
+      restaurantId: restaurant._id,
+      restaurantSlug,
+      tableId: table._id,
+      tableNumber: table.tableNumber,
+      guestId: guestId || guestSessionId || '',
+      deviceId: deviceId || '',
+      sessionId: sessionId || '',
+      customerName: customerName?.trim() || 'Guest',
+      customerPhone: customerPhone?.trim() || '',
+      items: validatedNewItems,
+      subtotal,
+      discount: totalDiscount,
+      tax,
+      serviceCharge,
+      grandTotal,
+      estimatedPrepTime: maxPrepTime,
+    };
   }
 
   // Feature Flag Validation
@@ -65,95 +237,266 @@ export const createPaymentOrderService = async ({
   }
 
   const razorpay = getRazorpayInstance();
-  const amountInPaise = Math.max(100, Math.round(order.grandTotal * 100)); // Minimum 100 paise (₹1)
 
   // Call Razorpay API to create order
   const rzpOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: 'INR',
-    receipt: order.orderNumber,
+    receipt: receiptIdentifier,
     notes: {
-      orderId: order._id.toString(),
+      isPrepay: prepayPayload ? 'true' : 'false',
+      orderId: order ? order._id.toString() : '',
       restaurantId: restaurant._id.toString(),
-      orderNumber: order.orderNumber,
-      tableNumber: String(order.tableNumber),
+      orderNumber: order?.orderNumber || '',
+      tableNumber: String(order ? order.tableNumber : table?.tableNumber || ''),
     },
   });
 
   // Record or update Payment model in MongoDB
-  let payment = await Payment.findOne({ orderId: order._id, status: 'created' });
-  if (!payment) {
-    payment = new Payment({
-      restaurantId: restaurant._id,
-      orderId: order._id,
-      guestSessionId: guestSessionId || order.guestId || '',
-      razorpayOrderId: rzpOrder.id,
-      amount: order.grandTotal,
-      currency: 'INR',
-      status: 'created',
-      email: customerEmail || order.customerEmail || '',
-      phone: customerPhone || order.customerPhone || '',
-      notes: rzpOrder.notes,
-      metadata: {
-        razorpayOrder: rzpOrder,
-        mode: env.RAZORPAY_MODE || 'test',
-      },
-      auditHistory: [
-        {
-          action: 'CREATE_ORDER',
-          status: 'created',
-          actor: 'customer',
-          timestamp: new Date(),
-          details: { razorpayOrderId: rzpOrder.id, amountInPaise },
-        },
-      ],
-    });
-  } else {
-    payment.razorpayOrderId = rzpOrder.id;
-    payment.amount = order.grandTotal;
-    payment.metadata = {
+  const payment = new Payment({
+    restaurantId: restaurant._id,
+    orderId: order ? order._id : null,
+    tableId: table ? table._id : (order ? order.tableId : null),
+    guestSessionId: guestSessionId || guestId || (order ? order.guestId : '') || '',
+    razorpayOrderId: rzpOrder.id,
+    amount: grandTotal,
+    currency: 'INR',
+    status: 'created',
+    email: customerEmail || (order ? order.customerEmail : '') || '',
+    phone: customerPhone || (order ? order.customerPhone : '') || '',
+    notes: rzpOrder.notes,
+    metadata: {
+      prepay: Boolean(prepayPayload),
+      prepayOrderPayload: prepayPayload || undefined,
       razorpayOrder: rzpOrder,
       mode: env.RAZORPAY_MODE || 'test',
-    };
-    payment.auditHistory.push({
-      action: 'RECREATE_ORDER',
-      status: 'created',
-      actor: 'customer',
-      timestamp: new Date(),
-      details: { razorpayOrderId: rzpOrder.id, amountInPaise },
-    });
-  }
+    },
+    auditHistory: [
+      {
+        action: prepayPayload ? 'PREPAY_PAYMENT_ORDER_CREATED' : 'CREATE_ORDER',
+        status: 'created',
+        actor: 'customer',
+        timestamp: new Date(),
+        details: { razorpayOrderId: rzpOrder.id, amountInPaise },
+      },
+    ],
+  });
 
   await payment.save();
 
-  // Socket notification
-  emitSyncEvent({
-    event: SOCKET_EVENTS.PAYMENT_CREATED,
-    restaurantId: restaurant._id,
-    data: {
-      orderId: order._id,
-      orderNumber: order.orderNumber,
-      amount: order.grandTotal,
-      razorpayOrderId: rzpOrder.id,
-    },
-  });
+  if (order) {
+    emitSyncEvent({
+      event: SOCKET_EVENTS.PAYMENT_CREATED,
+      restaurantId: restaurant._id,
+      data: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        amount: order.grandTotal,
+        razorpayOrderId: rzpOrder.id,
+      },
+    });
+  }
 
   return {
     razorpayOrderId: rzpOrder.id,
-    amount: order.grandTotal,
+    amount: grandTotal,
     amountInPaise,
     currency: 'INR',
     keyId: env.RAZORPAY_KEY_ID?.trim() || '',
-    orderId: order._id,
-    orderNumber: order.orderNumber,
+    orderId: order?._id || null,
+    orderNumber: order?.orderNumber || null,
     restaurantName: restaurant.restaurantName,
-    description: `Order #${order.orderNumber} - Table ${order.tableNumber}`,
+    description: order
+      ? `Order #${order.orderNumber} - Table ${order.tableNumber}`
+      : `Table ${table?.tableNumber} Order — ${restaurant.restaurantName}`,
     prefill: {
-      name: order.customerName || 'Guest',
+      name: (order ? order.customerName : customerName) || 'Guest',
       email: customerEmail || '',
-      contact: customerPhone || order.customerPhone || '',
+      contact: customerPhone || (order ? order.customerPhone : '') || '',
     },
   };
+};
+
+/**
+ * Atomically creates a restaurant order from verified prepay payload.
+ * Ensures strict idempotency: if an order is already created for this payment or razorpayOrderId,
+ * returns the existing order immediately.
+ */
+export const createPrepaidOrderFromPayload = async (payment, razorpayPaymentId, razorpaySignature) => {
+  if (!payment) return null;
+
+  // 1. Idempotency Check: If already linked to an order, return existing order
+  if (payment.orderId) {
+    const existingOrder = await Order.findById(payment.orderId);
+    if (existingOrder) {
+      return existingOrder;
+    }
+  }
+
+  // Double check if an order already exists with metadata.razorpayOrderId
+  const existingOrderByRzp = await Order.findOne({
+    $or: [
+      { 'metadata.razorpayOrderId': payment.razorpayOrderId },
+      { 'notes.razorpayOrderId': payment.razorpayOrderId },
+    ],
+  });
+  if (existingOrderByRzp) {
+    payment.orderId = existingOrderByRzp._id;
+    payment.status = 'captured';
+    if (razorpayPaymentId) payment.razorpayPaymentId = razorpayPaymentId;
+    await payment.save();
+    return existingOrderByRzp;
+  }
+
+  const prepayPayload = payment.metadata?.prepayOrderPayload;
+  if (!prepayPayload) {
+    const error = new Error('Prepay order specification payload is missing.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // 2. Generate unique sequential Order Number
+  const orderNumber = await getNextOrderNumber(2027);
+
+  // 3. Create the Order with status: 'placed', kitchenStatus: 'pending', cashierStatus: 'paid', paymentStatus: 'paid_online'
+  const order = await Order.create({
+    restaurantId: prepayPayload.restaurantId,
+    tableId: prepayPayload.tableId,
+    tableNumber: prepayPayload.tableNumber,
+    guestId: prepayPayload.guestId,
+    deviceId: prepayPayload.deviceId || '',
+    sessionId: prepayPayload.sessionId || '',
+    orderNumber,
+    items: prepayPayload.items,
+    subtotal: prepayPayload.subtotal,
+    discount: prepayPayload.discount,
+    tax: prepayPayload.tax,
+    serviceCharge: prepayPayload.serviceCharge,
+    grandTotal: prepayPayload.grandTotal,
+    status: 'placed',
+    statusHistory: [
+      {
+        status: 'placed',
+        timestamp: new Date(),
+        updatedBy: 'razorpay',
+        note: `Prepaid online order confirmed via Razorpay (${razorpayPaymentId || payment.razorpayPaymentId || 'verified'})`,
+      },
+    ],
+    kitchenStatus: 'pending',
+    cashierStatus: 'paid',
+    paymentStatus: 'paid_online',
+    paymentMethod: 'online',
+    customerName: prepayPayload.customerName?.trim() || 'Guest',
+    customerPhone: prepayPayload.customerPhone?.trim() || '',
+    estimatedPrepTime: prepayPayload.estimatedPrepTime || 15,
+    createdBy: 'customer',
+    updatedBy: 'customer',
+    metadata: {
+      razorpayOrderId: payment.razorpayOrderId,
+      razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
+      isPrepaid: true,
+    },
+    notes: {
+      razorpayOrderId: payment.razorpayOrderId,
+      prepaid: 'true',
+    },
+    isDeleted: false,
+  });
+
+  // 4. Update and link Payment record
+  payment.orderId = order._id;
+  payment.status = 'captured';
+  if (razorpayPaymentId) {
+    payment.razorpayPaymentId = razorpayPaymentId;
+    payment.paymentId = razorpayPaymentId;
+  }
+  if (razorpaySignature) {
+    payment.razorpaySignature = razorpaySignature;
+  }
+  payment.capturedAt = new Date();
+  payment.auditHistory.push({
+    action: 'PREPAY_ORDER_CREATED',
+    status: 'captured',
+    actor: 'system',
+    timestamp: new Date(),
+    details: { orderId: order._id, orderNumber: order.orderNumber, razorpayOrderId: payment.razorpayOrderId },
+  });
+  await payment.save();
+
+  // 5. Update Table to Occupied
+  try {
+    const table = await Table.findById(prepayPayload.tableId);
+    if (table) {
+      table.status = 'occupied';
+      table.occupiedAt = new Date();
+      table.currentOrderId = order._id;
+      table.currentGuestSessionId = prepayPayload.guestId;
+      await table.save();
+      emitToTable(table._id, 'table-updated', {
+        tableId: table._id,
+        status: 'occupied',
+        currentOrderId: order._id,
+      });
+    }
+  } catch (tErr) {
+    console.warn('[Prepay] Table occupancy update note:', tErr.message);
+  }
+
+  // 6. Update GuestSession
+  try {
+    await GuestSession.findOneAndUpdate(
+      { guestId: prepayPayload.guestId },
+      {
+        $set: {
+          deviceId: prepayPayload.deviceId || 'unknown_device',
+          sessionId: prepayPayload.sessionId || 'session_default',
+          customerName: prepayPayload.customerName?.trim() || 'Guest',
+          customerPhone: prepayPayload.customerPhone?.trim() || '',
+          activeOrder: order._id,
+          lastActiveAt: new Date(),
+        },
+        $addToSet: { orders: order._id },
+      },
+      { upsert: true }
+    );
+  } catch (gErr) {
+    console.warn('[Prepay] GuestSession update note:', gErr.message);
+  }
+
+  // 7. Generate Immutable Receipt Snapshot
+  try {
+    const receipt = await generateReceiptSnapshot(order._id);
+    if (receipt) {
+      payment.receiptId = receipt._id;
+      await payment.save();
+    }
+  } catch (rErr) {
+    console.warn('[Prepay] Receipt generation note:', rErr.message);
+  }
+
+  // 8. Instant Real-Time Socket Notifications to Kitchen & Restaurant Panel
+  try {
+    emitToRestaurant(order.restaurantId, 'new-order', order);
+    emitToRestaurant(order.restaurantId, SOCKET_EVENTS.ORDER_CREATED, order);
+    emitToRestaurant(order.restaurantId, 'order-updated', order);
+    emitToOrder(order._id, 'order-updated', order);
+    emitToTable(order.tableId, 'order-updated', order);
+    emitToAdmin(SOCKET_EVENTS.ORDER_CREATED, order);
+    emitSyncEvent({
+      event: SOCKET_EVENTS.PAYMENT_SUCCESS,
+      restaurantId: order.restaurantId,
+      data: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        amount: order.grandTotal,
+        paymentId: razorpayPaymentId,
+      },
+    });
+  } catch (sErr) {
+    console.warn('[Prepay] Socket emission note:', sErr.message);
+  }
+
+  return order;
 };
 
 /**
@@ -213,7 +556,31 @@ export const verifyPaymentService = async ({
 
   // Find payment and order
   const payment = await Payment.findOne({ razorpayOrderId });
-  const order = await Order.findById(orderId || payment?.orderId);
+  if (!payment) {
+    const error = new Error('Payment record for this transaction was not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  let order = null;
+  if (orderId) {
+    order = await Order.findById(orderId);
+  } else if (payment.orderId) {
+    order = await Order.findById(payment.orderId);
+  }
+
+  // PREPAY FLOW: Order is created ONLY after payment signature is verified!
+  if (!order && payment.metadata?.prepayOrderPayload) {
+    order = await createPrepaidOrderFromPayload(payment, razorpayPaymentId, razorpaySignature);
+    const receipt = payment.receiptId ? await generateReceiptSnapshot(order._id) : null;
+    return {
+      verified: true,
+      message: 'Payment verified and order created successfully.',
+      order,
+      payment,
+      receipt,
+    };
+  }
 
   if (!order) {
     const error = new Error('Order associated with this payment was not found.');

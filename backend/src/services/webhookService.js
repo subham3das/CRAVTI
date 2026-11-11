@@ -252,6 +252,16 @@ export const processRazorpayWebhook = async ({ rawBody, signature, headers = {},
           });
         }
 
+        // PREPAY IDEMPOTENT ORDER CREATION VIA WEBHOOK (if not already verified by frontend callback)
+        if (!order && payment?.metadata?.prepayOrderPayload) {
+          try {
+            const { createPrepaidOrderFromPayload } = await import('./paymentService.js');
+            order = await createPrepaidOrderFromPayload(payment, rzpPaymentId, null);
+          } catch (prepayErr) {
+            console.warn('[Webhook] Prepay order creation note:', prepayErr.message);
+          }
+        }
+
         const effectiveRestaurantId =
           restaurantId || order?.restaurantId || payment?.restaurantId || null;
         const effectiveTableId = tableId || order?.tableId || payment?.tableId || null;

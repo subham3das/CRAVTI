@@ -15,3 +15,4 @@ export default function MerchantTermsPage() {
   if (!doc) notFound();
   return <LegalLayout document={doc} />;
 }
+

@@ -1,6 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiX, FiPlus, FiMinus, FiTrash2, FiShoppingBag, FiArrowRight, FiUser, FiPhone, FiDollarSign, FiCreditCard } from 'react-icons/fi';
+import {
+  FiX,
+  FiPlus,
+  FiMinus,
+  FiTrash2,
+  FiShoppingBag,
+  FiArrowRight,
+  FiUser,
+  FiPhone,
+  FiDollarSign,
+  FiCreditCard,
+} from 'react-icons/fi';
 import { CustomerVegBadge } from './CustomerVegBadge';
 import { CustomerFooter } from './CustomerFooter';
 import { formatCurrency } from '../../utils/formatters';
@@ -19,10 +30,17 @@ export const CustomerCartDrawer = ({
   restaurantName,
   isPlacingOrder,
   hasActiveOrder = false,
+  initialPaymentMethod = 'cash',
 }) => {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'online'
+  const [paymentMethod, setPaymentMethod] = useState(initialPaymentMethod); // 'cash' | 'online'
+
+  useEffect(() => {
+    if (initialPaymentMethod) {
+      setPaymentMethod(initialPaymentMethod);
+    }
+  }, [initialPaymentMethod]);
 
   if (!isOpen) return null;
 
@@ -42,8 +60,8 @@ export const CustomerCartDrawer = ({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+          onClick={isPlacingOrder ? undefined : onClose}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm cursor-pointer"
         />
 
         {/* Drawer Container */}
@@ -55,7 +73,7 @@ export const CustomerCartDrawer = ({
           className="relative bg-white w-full max-w-md rounded-t-3xl shadow-2xl flex flex-col max-h-[92vh] z-10 overflow-hidden"
         >
           {/* Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-emerald-50 text-[#16A34A] flex items-center justify-center font-bold text-xs">
                 T{tableNumber}
@@ -69,15 +87,17 @@ export const CustomerCartDrawer = ({
             </div>
 
             <button
-              onClick={onClose}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              onClick={isPlacingOrder ? undefined : onClose}
+              disabled={isPlacingOrder}
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-40"
+              aria-label="Close cart"
             >
               <FiX className="w-5 h-5" />
             </button>
           </div>
 
           {/* Body */}
-          {cart.length === 0 ? (
+          {cartItems.length === 0 ? (
             <div className="p-12 flex flex-col items-center justify-center text-center">
               <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 mb-3">
                 <FiShoppingBag className="w-8 h-8" />
@@ -116,7 +136,7 @@ export const CustomerCartDrawer = ({
 
                       {item.specialInstructions && (
                         <p className="text-[10px] text-amber-700 mt-1 italic line-clamp-1">
-                          "{item.specialInstructions}"
+                          &quot;{item.specialInstructions}&quot;
                         </p>
                       )}
                     </div>
@@ -126,8 +146,9 @@ export const CustomerCartDrawer = ({
                       <div className="flex items-center border border-slate-200 rounded-lg bg-white shadow-2xs">
                         <button
                           type="button"
+                          disabled={isPlacingOrder}
                           onClick={() => onUpdateQuantity(item.menuItemId, item.quantity - 1)}
-                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors"
+                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-l-lg transition-colors disabled:opacity-40"
                         >
                           <FiMinus className="w-3 h-3" />
                         </button>
@@ -136,17 +157,19 @@ export const CustomerCartDrawer = ({
                         </span>
                         <button
                           type="button"
+                          disabled={isPlacingOrder}
                           onClick={() => onUpdateQuantity(item.menuItemId, item.quantity + 1)}
-                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors"
+                          className="w-7 h-7 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-r-lg transition-colors disabled:opacity-40"
                         >
-                          <FiPlus className="w-3 h-3" />
+                          <FiPlus className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
                       <button
                         type="button"
+                        disabled={isPlacingOrder}
                         onClick={() => onRemoveItem(item.menuItemId)}
-                        className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition-colors disabled:opacity-40"
                         title="Remove"
                       >
                         <FiTrash2 className="w-3.5 h-3.5" />
@@ -166,10 +189,11 @@ export const CustomerCartDrawer = ({
                   <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                   <input
                     type="text"
+                    disabled={isPlacingOrder}
                     placeholder="Your Name (e.g. John)"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full text-xs pl-8 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A]"
+                    className="w-full text-xs pl-8 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A] disabled:opacity-60"
                   />
                 </div>
 
@@ -177,10 +201,11 @@ export const CustomerCartDrawer = ({
                   <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                   <input
                     type="tel"
+                    disabled={isPlacingOrder}
                     placeholder="Phone number (for bill SMS)"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full text-xs pl-8 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A]"
+                    className="w-full text-xs pl-8 pr-3 py-2 rounded-lg bg-slate-50 border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A] disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -191,9 +216,9 @@ export const CustomerCartDrawer = ({
           )}
 
           {/* Sticky Checkout Bottom Section (Payment Method + Bill Summary + Place Order CTA) */}
-          {cart.length > 0 && (
+          {cartItems.length > 0 && (
             <div
-              className="shrink-0 bg-white border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] p-4 space-y-3 z-20"
+              className="sticky bottom-0 left-0 right-0 shrink-0 bg-white border-t border-slate-200/90 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] p-4 space-y-3 z-30"
               style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
             >
               {/* Payment Method Selector */}
@@ -208,8 +233,9 @@ export const CustomerCartDrawer = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
+                    disabled={isPlacingOrder}
                     onClick={() => setPaymentMethod('cash')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
                       paymentMethod === 'cash'
                         ? 'border-[#16A34A] bg-emerald-50 text-[#16A34A] ring-1 ring-[#16A34A]/30 shadow-2xs'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -221,8 +247,9 @@ export const CustomerCartDrawer = ({
 
                   <button
                     type="button"
+                    disabled={isPlacingOrder}
                     onClick={() => setPaymentMethod('online')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 ${
                       paymentMethod === 'online'
                         ? 'border-[#16A34A] bg-emerald-50 text-[#16A34A] ring-1 ring-[#16A34A]/30 shadow-2xs'
                         : 'border-slate-200 text-slate-600 hover:bg-slate-50'
@@ -277,9 +304,13 @@ export const CustomerCartDrawer = ({
                     <span className="inline-flex items-center gap-2">
                       <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
                       </svg>
-                      Sending to Kitchen...
+                      Processing Payment...
                     </span>
                   ) : (
                     <>
@@ -302,3 +333,5 @@ export const CustomerCartDrawer = ({
     </AnimatePresence>
   );
 };
+
+export default CustomerCartDrawer;

@@ -15,3 +15,4 @@ export default function PaymentPolicyPage() {
   if (!doc) notFound();
   return <LegalLayout document={doc} />;
 }
+

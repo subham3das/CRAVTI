@@ -14,12 +14,30 @@ import env from '../config/env.js';
 
 /**
  * POST /api/payment/create-order
- * Customer creates Razorpay payment order for their active order
+ * Customer creates Razorpay payment order for their active order or PREPAY cart checkout
  */
 export const createPaymentOrder = asyncHandler(async (req, res) => {
-  const { orderId, customerEmail, customerPhone, guestSessionId } = req.body;
-  if (!orderId) {
-    return sendError(res, 'Order ID is required', 'orderId missing', HTTP_STATUS.BAD_REQUEST);
+  const {
+    orderId,
+    customerEmail,
+    customerPhone,
+    guestSessionId,
+    restaurantSlug,
+    tableIdentifier,
+    guestId,
+    deviceId,
+    sessionId,
+    customerName,
+    items,
+  } = req.body;
+
+  if (!orderId && (!restaurantSlug || !items || !items.length)) {
+    return sendError(
+      res,
+      'Either orderId or (restaurantSlug and items) is required to initialize payment',
+      'Missing required payment order fields',
+      HTTP_STATUS.BAD_REQUEST
+    );
   }
 
   const orderData = await createPaymentOrderService({
@@ -27,6 +45,13 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     customerEmail,
     customerPhone,
     guestSessionId,
+    restaurantSlug,
+    tableIdentifier,
+    guestId,
+    deviceId,
+    sessionId,
+    customerName,
+    items,
   });
 
   return sendSuccess(res, 'Payment order created successfully', orderData, HTTP_STATUS.CREATED);
