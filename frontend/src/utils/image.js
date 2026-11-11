@@ -24,3 +24,4 @@ export const getImageUrl = (image, placeholder = '') => {
 export default {
   getImageUrl,
 };
+

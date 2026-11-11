@@ -3,20 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiX,
   FiSearch,
-  FiPlus,
-  FiMinus,
-  FiTrash2,
   FiPrinter,
-  FiCheck,
-  FiAlertCircle,
-  FiUser,
-  FiPhone,
   FiTag,
-  FiPercent,
-  FiDollarSign,
   FiSend,
 } from 'react-icons/fi';
-import { MdOutlineTableRestaurant, MdDirectionsWalk } from 'react-icons/md';
+import {
+  MdOutlineTableRestaurant,
+  MdDirectionsWalk,
+  MdLocalFireDepartment,
+} from 'react-icons/md';
 import { fetchMenuItemsApi } from '../../services/menuService';
 import { fetchCategoriesApi } from '../../services/categoryService';
 import { fetchTablesApi } from '../../services/tableService';
@@ -24,15 +19,18 @@ import { fetchSettingsApi } from '../../services/settingsService';
 import {
   createManualOrderApi,
   updateManualOrderApi,
-  markManualOrderPaidApi,
   printManualOrderReceiptApi,
 } from '../../services/orderService';
-import { ImageWithFallback } from '../ImageWithFallback';
-import { CustomerVegBadge } from '../customer/CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
-import { safeString, safeTrim, safeLower } from '../../utils/string';
+import { safeTrim, safeLower } from '../../utils/string';
 import { getImageUrl } from '../../utils/image';
 import toast from 'react-hot-toast';
+
+// Modular Subcomponents
+import { PosMenuCard } from './pos/PosMenuCard';
+import { PosTableSelector } from './pos/PosTableSelector';
+import { PosOrderItem } from './pos/PosOrderItem';
+import { PosPaymentSelector } from './pos/PosPaymentSelector';
 
 export const ManualBillingModal = ({
   isOpen,
@@ -41,6 +39,9 @@ export const ManualBillingModal = ({
   existingOrder = null,
   onOpenReceipt,
 }) => {
+  // Input Ref for Autofocus & Shortcuts
+  const searchInputRef = useRef(null);
+
   // Data State
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
@@ -124,8 +125,14 @@ export const ManualBillingModal = ({
 
     loadInitialData();
 
+    // Autofocus search on open
+    const timer = setTimeout(() => {
+      searchInputRef.current?.focus();
+    }, 120);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, [isOpen]);
 
@@ -214,6 +221,17 @@ export const ManualBillingModal = ({
 
     return items;
   }, [menuItems, activeCategory, foodTypeFilter, searchQuery]);
+
+  // Frequently Ordered (Popular / Recommended Items)
+  const popularItems = useMemo(() => {
+    const items = Array.isArray(menuItems) ? menuItems : [];
+    const list = items.filter(
+      (item) =>
+        (item.popular || item.recommended) &&
+        item.availability !== 'out_of_stock'
+    );
+    return list.slice(0, 6);
+  }, [menuItems]);
 
   // 4. Cart Modifiers
   const handleAddItem = (item) => {
@@ -448,6 +466,68 @@ export const ManualBillingModal = ({
     }
   };
 
+  // 8. Accessibility: Keyboard Shortcuts
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      // Esc -> close
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      // Ctrl+F or Cmd+F -> Search Menu
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      // Ctrl+B or Cmd+B -> Generate Bill
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        if (!submitting && cartItems.length > 0) {
+          handleSubmitBill('generate');
+        }
+        return;
+      }
+
+      // Ctrl+S or Cmd+S -> Save Draft
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (!submitting && cartItems.length > 0) {
+          handleSubmitBill('save_draft');
+        }
+        return;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [
+    isOpen,
+    submitting,
+    cartItems,
+    selectedTableId,
+    billType,
+    customerName,
+    customerPhone,
+    sendToKitchen,
+    billNotes,
+    discountType,
+    discountValue,
+    packagingCharge,
+    paymentMethod,
+    splitCash,
+    splitUpi,
+    splitCard,
+  ]);
+
   if (!isOpen) return null;
 
   return (
@@ -459,43 +539,71 @@ export const ManualBillingModal = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm"
+          className="fixed inset-0 bg-slate-950/65 backdrop-blur-sm"
         />
 
         {/* Desktop-First Full Billing Console Dialog */}
         <motion.div
-          initial={{ scale: 0.98, opacity: 0, y: 10 }}
+          initial={{ scale: 0.98, opacity: 0, y: 8 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
-          exit={{ scale: 0.98, opacity: 0, y: 10 }}
-          className="relative bg-white w-full max-w-[1400px] h-[95vh] rounded-2xl shadow-2xl flex flex-col z-10 overflow-hidden"
+          exit={{ scale: 0.98, opacity: 0, y: 8 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="relative bg-white w-full max-w-[1700px] h-[96vh] rounded-2xl shadow-2xl flex flex-col z-10 overflow-hidden border border-slate-200"
         >
-          {/* Top Bar */}
-          <header className="px-6 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0">
+          {/* Top Header Bar */}
+          <header className="px-5 py-3 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
             <div className="flex items-center gap-3">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#16A34A] animate-pulse" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-500/20" />
               <div>
-                <h2 className="text-base font-black tracking-wide flex items-center gap-2">
-                  <span>CRAVITI POS BILLING</span>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-black tracking-wide uppercase font-mono">
+                    Craviti POS Billing
+                  </h2>
                   {createdOrderNumber && (
-                    <span className="text-xs font-mono font-bold bg-[#16A34A] px-2 py-0.5 rounded text-white">
+                    <span className="text-[11px] font-mono font-bold bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-emerald-300">
                       #{createdOrderNumber}
                     </span>
                   )}
-                </h2>
-                <p className="text-[11px] text-slate-400">
+                </div>
+                <p className="text-[11px] text-slate-400 hidden sm:block">
                   Fast Manual Billing & Table Settlements (Petpooja Style)
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Header Right Actions & Shortcuts Badge */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Keyboard shortcuts reminder pill */}
+              <div className="hidden xl:flex items-center gap-2 text-[10px] font-medium text-slate-400 bg-slate-800/80 border border-slate-700/60 px-2.5 py-1 rounded-lg">
+                <span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 text-slate-200 rounded text-[9px] font-mono">
+                    Ctrl+F
+                  </kbd>{' '}
+                  Search
+                </span>
+                <span className="opacity-40">•</span>
+                <span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 text-slate-200 rounded text-[9px] font-mono">
+                    Ctrl+B
+                  </kbd>{' '}
+                  Generate
+                </span>
+                <span className="opacity-40">•</span>
+                <span>
+                  <kbd className="px-1.5 py-0.5 bg-slate-700 text-slate-200 rounded text-[9px] font-mono">
+                    Esc
+                  </kbd>{' '}
+                  Close
+                </span>
+              </div>
+
               {(createdOrderId || existingOrder?._id) && (
                 <button
                   type="button"
                   onClick={() => handlePrintReceipt()}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <FiPrinter className="w-3.5 h-3.5" />
+                  <FiPrinter className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Print Receipt</span>
                 </button>
               )}
@@ -504,6 +612,7 @@ export const ManualBillingModal = ({
                 type="button"
                 onClick={onClose}
                 className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                title="Close (Esc)"
               >
                 <FiX className="w-5 h-5" />
               </button>
@@ -513,20 +622,22 @@ export const ManualBillingModal = ({
           {/* Main 2-Column Split Area */}
           <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
             {/* ======================================================== */}
-            {/* LEFT COLUMN: Menu Search, Categories & Interactive Cards */}
+            {/* LEFT COLUMN: Menu Search, Categories & Food Cards (70%) */}
             {/* ======================================================== */}
-            <div className="w-full lg:w-3/5 xl:w-2/3 flex flex-col border-r border-slate-200 overflow-hidden bg-slate-50/50">
-              {/* Search & Food Type Filter Bar */}
-              <div className="p-4 bg-white border-b border-slate-200/80 space-y-3">
-                <div className="flex gap-2.5">
+            <div className="w-full lg:w-[65%] xl:w-[70%] flex flex-col border-r border-slate-200/90 overflow-hidden bg-slate-50/60">
+              {/* Sticky Top Header: Search & Food Type Filter */}
+              <div className="p-3.5 sm:p-4 bg-white border-b border-slate-200 space-y-3 sticky top-0 z-20 shadow-2xs">
+                <div className="flex gap-2.5 items-center">
+                  {/* Search Bar */}
                   <div className="relative flex-1">
                     <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
                     <input
+                      ref={searchInputRef}
                       type="text"
-                      placeholder="Search menu items (e.g. Paneer, Pizza, Burger, Cold Drink)..."
+                      placeholder="Search menu items..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full text-xs pl-10 pr-9 py-2.5 rounded-xl bg-slate-100/90 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/40 focus:bg-white transition-all"
+                      className="w-full text-xs font-medium pl-10 pr-9 py-2.5 rounded-xl bg-slate-100/90 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 focus:bg-white transition-all text-slate-900 placeholder:text-slate-400"
                     />
                     {searchQuery && (
                       <button
@@ -539,12 +650,12 @@ export const ManualBillingModal = ({
                     )}
                   </div>
 
-                  {/* Veg / Non-Veg Quick Switch */}
-                  <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0">
+                  {/* Veg / Non-Veg Quick Switch Filter */}
+                  <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-bold shrink-0 border border-slate-200/60">
                     <button
                       type="button"
                       onClick={() => setFoodTypeFilter('all')}
-                      className={`px-3 py-1.5 rounded-lg transition-colors ${
+                      className={`px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
                         foodTypeFilter === 'all'
                           ? 'bg-white text-slate-900 shadow-2xs'
                           : 'text-slate-500 hover:text-slate-800'
@@ -555,37 +666,37 @@ export const ManualBillingModal = ({
                     <button
                       type="button"
                       onClick={() => setFoodTypeFilter('veg')}
-                      className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
                         foodTypeFilter === 'veg'
                           ? 'bg-emerald-600 text-white shadow-2xs'
                           : 'text-emerald-700 hover:bg-emerald-50'
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full bg-emerald-300" /> Veg
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" /> Veg
                     </button>
                     <button
                       type="button"
                       onClick={() => setFoodTypeFilter('non-veg')}
-                      className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 ${
+                      className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer ${
                         foodTypeFilter === 'non-veg'
                           ? 'bg-rose-600 text-white shadow-2xs'
                           : 'text-rose-700 hover:bg-rose-50'
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full bg-rose-300" /> Non-Veg
+                      <span className="w-1.5 h-1.5 rounded-full bg-rose-300" /> Non-Veg
                     </button>
                   </div>
                 </div>
 
                 {/* Category Horizontal Scroll Chips */}
-                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none no-scrollbar pt-1">
+                <div className="flex items-center gap-2 overflow-x-auto scrollbar-none no-scrollbar pt-0.5">
                   <button
                     type="button"
                     onClick={() => setActiveCategory('ALL')}
-                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 shrink-0 cursor-pointer ${
                       activeCategory === 'ALL'
-                        ? 'bg-[#16A34A] text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
                     All Items ({menuItems.length})
@@ -596,10 +707,10 @@ export const ManualBillingModal = ({
                       key={cat._id}
                       type="button"
                       onClick={() => setActiveCategory(cat._id)}
-                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shrink-0 ${
+                      className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-150 shrink-0 cursor-pointer ${
                         activeCategory === cat._id
-                          ? 'bg-[#16A34A] text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          ? 'bg-slate-900 text-white shadow-xs'
+                          : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
                       {cat.categoryName}
@@ -608,116 +719,82 @@ export const ManualBillingModal = ({
                 </div>
               </div>
 
-              {/* Items Grid */}
-              <div className="flex-1 overflow-y-auto p-4">
+              {/* Items Grid & Frequently Ordered Section */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Frequently Ordered Section (If available & no search active) */}
+                {!searchQuery && activeCategory === 'ALL' && popularItems.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                      <MdLocalFireDepartment className="w-4 h-4 text-amber-500" />
+                      <h3 className="font-extrabold text-xs text-slate-900 uppercase tracking-wider">
+                        Frequently Ordered Quick Picks
+                      </h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2">
+                      {popularItems.map((item) => {
+                        const qty = getItemQuantityInCart(item._id);
+                        return (
+                          <button
+                            key={`quick-${item._id}`}
+                            type="button"
+                            onClick={() => handleAddItem(item)}
+                            className="p-2 bg-white rounded-xl border border-slate-200/90 hover:border-slate-400 hover:shadow-sm text-left transition-all flex flex-col justify-between group cursor-pointer"
+                          >
+                            <span className="font-bold text-[11px] text-slate-800 line-clamp-1 group-hover:text-slate-950">
+                              {item.itemName}
+                            </span>
+                            <div className="flex items-center justify-between mt-1 text-[11px]">
+                              <span className="font-extrabold text-slate-900">
+                                {formatCurrency(item.sellingPrice || item.price || 0)}
+                              </span>
+                              {qty > 0 && (
+                                <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] font-bold flex items-center justify-center">
+                                  {qty}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Main Menu Cards Grid */}
                 {loading ? (
-                  <div className="flex items-center justify-center h-48 text-slate-400 text-xs font-semibold">
-                    Loading live restaurant menu...
+                  <div className="flex flex-col items-center justify-center h-52 text-slate-400 text-xs font-semibold space-y-2">
+                    <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+                    <span>Loading live restaurant menu...</span>
                   </div>
                 ) : filteredMenuItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-64 text-center">
-                    <p className="text-slate-500 font-bold text-sm">No items found</p>
-                    <p className="text-slate-400 text-xs mt-1">
-                      Try clearing search or selecting a different category.
+                    <p className="text-slate-700 font-bold text-sm">No items found</p>
+                    <p className="text-slate-400 text-xs mt-1 max-w-xs">
+                      Try clearing your search query or selecting a different category.
                     </p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
                     {filteredMenuItems.map((item) => {
                       const qty = getItemQuantityInCart(item._id);
-                      const isOutOfStock = item.availability === 'out_of_stock';
-                      const hasDiscount =
-                        item.discountType &&
-                        item.discountType !== 'none' &&
-                        safeNumber(item.discountValue) > 0;
-
                       return (
-                        <div
+                        <PosMenuCard
                           key={item._id}
-                          className={`bg-white rounded-xl p-3 border border-slate-200/90 shadow-2xs hover:shadow-sm hover:border-[#16A34A]/50 transition-all flex flex-col justify-between select-none ${
-                            isOutOfStock ? 'opacity-50 grayscale' : ''
-                          }`}
-                        >
-                          <div className="flex gap-3">
-                            <div className="w-16 h-16 rounded-lg overflow-hidden relative bg-slate-100 shrink-0 border border-slate-100">
-                              <ImageWithFallback
-                                src={getImageUrl(item.image)}
-                                alt={safeString(item.itemName)}
-                                type="menu"
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <CustomerVegBadge type={item.foodType} />
-                                <span className="text-[10px] font-semibold text-slate-400 uppercase truncate">
-                                  {item.categoryId?.categoryName || 'Item'}
-                                </span>
-                              </div>
-
-                              <h4
-                                className="font-extrabold text-xs text-slate-900 leading-snug line-clamp-2 mt-0.5"
-                                title={item.itemName}
-                              >
-                                {item.itemName}
-                              </h4>
-
-                              <div className="flex items-baseline gap-1.5 mt-1">
-                                <span className="font-extrabold text-xs text-slate-900">
-                                  {formatCurrency(item.sellingPrice || item.price || 0)}
-                                </span>
-                                {hasDiscount && (
-                                  <span className="text-[10px] text-slate-400 line-through">
-                                    {formatCurrency(item.price || 0)}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Add / Stepper Row */}
-                          <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between">
-                            {isOutOfStock ? (
-                              <span className="text-[10px] font-bold text-rose-500 uppercase">
-                                Sold Out
-                              </span>
-                            ) : qty === 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => handleAddItem(item)}
-                                className="w-full py-1.5 bg-emerald-50 hover:bg-[#16A34A] text-[#16A34A] hover:text-white border border-[#16A34A]/30 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <FiPlus className="w-3.5 h-3.5" /> ADD
-                              </button>
-                            ) : (
-                              <div className="w-full flex items-center justify-between bg-[#16A34A] text-white rounded-lg px-2 py-1">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const matchIdx = cartItems.findIndex(
-                                      (c) => (c.itemId || c.menuItemId) === item._id
-                                    );
-                                    if (matchIdx > -1) {
-                                      handleUpdateQuantity(matchIdx, qty - 1);
-                                    }
-                                  }}
-                                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-emerald-700 transition-colors"
-                                >
-                                  <FiMinus className="w-3 h-3" />
-                                </button>
-                                <span className="text-xs font-black px-2">{qty}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddItem(item)}
-                                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-emerald-700 transition-colors"
-                                >
-                                  <FiPlus className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                          item={item}
+                          quantity={qty}
+                          onAdd={handleAddItem}
+                          onUpdateQuantity={(newQty) => {
+                            const matchIdx = cartItems.findIndex(
+                              (c) => (c.itemId || c.menuItemId) === item._id
+                            );
+                            if (matchIdx > -1) {
+                              handleUpdateQuantity(matchIdx, newQty);
+                            } else if (newQty > 0) {
+                              handleAddItem(item);
+                            }
+                          }}
+                        />
                       );
                     })}
                   </div>
@@ -726,20 +803,20 @@ export const ManualBillingModal = ({
             </div>
 
             {/* ======================================================== */}
-            {/* RIGHT COLUMN: POS Billing Console, Cart, Totals & Pay */}
+            {/* RIGHT COLUMN: POS Billing Console, Cart & Totals (30%)  */}
             {/* ======================================================== */}
-            <div className="w-full lg:w-2/5 xl:w-1/3 flex flex-col bg-white overflow-hidden">
-              {/* Bill Details Header: Walk-in vs Table & Customer Info */}
-              <div className="p-4 border-b border-slate-200/90 space-y-3 bg-slate-50/70">
-                {/* Walk-in vs Assign Table Toggle */}
-                <div className="grid grid-cols-2 gap-2 bg-slate-200/80 p-1 rounded-xl text-xs font-bold">
+            <div className="w-full lg:w-[35%] xl:w-[30%] flex flex-col bg-white overflow-hidden">
+              {/* SECTION 1: Table & Customer Information Card (Compact) */}
+              <div className="p-3.5 border-b border-slate-200/90 bg-slate-50/70 space-y-2.5 shrink-0">
+                {/* Walk-in vs Assign Table Segmented Toggle */}
+                <div className="grid grid-cols-2 gap-1.5 bg-slate-200/70 p-1 rounded-xl text-xs font-bold">
                   <button
                     type="button"
                     onClick={() => {
                       setBillType('walk_in');
                       setSelectedTableId('');
                     }}
-                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       billType === 'walk_in'
                         ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
@@ -752,47 +829,35 @@ export const ManualBillingModal = ({
                   <button
                     type="button"
                     onClick={() => setBillType('table')}
-                    className={`py-2 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       billType === 'table'
                         ? 'bg-white text-slate-900 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <MdOutlineTableRestaurant className="w-4 h-4 text-[#16A34A]" />
+                    <MdOutlineTableRestaurant className="w-4 h-4 text-indigo-600" />
                     <span>Assign Table</span>
                   </button>
                 </div>
 
                 {/* Table Picker if Table mode */}
                 {billType === 'table' && (
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
-                      Select Table <span className="text-rose-500">*</span>
-                    </label>
-                    <select
-                      value={selectedTableId}
-                      onChange={(e) => setSelectedTableId(e.target.value)}
-                      className="w-full text-xs px-3 py-2 rounded-xl bg-white border border-slate-200 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/40 font-semibold text-slate-800"
-                    >
-                      <option value="">-- Choose Dining Table --</option>
-                      {tables.map((t) => (
-                        <option key={t._id} value={t._id}>
-                          Table {t.tableNumber} {t.capacity ? `(${t.capacity} Seater)` : ''} • Floor {t.floor || '1'} {t.status === 'occupied' ? '[Occupied]' : '[Available]'}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <PosTableSelector
+                    tables={tables}
+                    selectedTableId={selectedTableId}
+                    onSelectTable={(id) => setSelectedTableId(id)}
+                  />
                 )}
 
-                {/* Customer Details & Kitchen Toggle */}
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                {/* Customer Details Inputs */}
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <input
                       type="text"
                       placeholder="Customer Name (Optional)"
                       value={customerName}
                       onChange={(e) => setCustomerName(e.target.value)}
-                      className="w-full text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A]"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900"
                     />
                   </div>
                   <div>
@@ -801,34 +866,37 @@ export const ManualBillingModal = ({
                       placeholder="Phone (Optional)"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full text-xs px-3 py-1.5 rounded-lg bg-white border border-slate-200 focus:outline-none focus:ring-1 focus:ring-[#16A34A]"
+                      className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-900"
                     />
                   </div>
                 </div>
 
-                {/* Kitchen Order Ticket (KOT) Toggle */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                    <FiSend className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Send to Kitchen (KOT)</span>
-                  </span>
-                  <label className="relative inline-flex items-center cursor-pointer">
+                {/* Kitchen Order Ticket (KOT) with clean checkbox styling */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-slate-700">
                     <input
                       type="checkbox"
                       checked={sendToKitchen}
                       onChange={(e) => setSendToKitchen(e.target.checked)}
-                      className="sr-only peer"
+                      className="w-4 h-4 rounded text-slate-900 focus:ring-slate-900 border-slate-300 accent-slate-900 cursor-pointer"
                     />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#16A34A]"></div>
+                    <span className="flex items-center gap-1">
+                      <FiSend className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>Send to Kitchen (KOT)</span>
+                    </span>
                   </label>
+
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {sendToKitchen ? 'Notify Cook' : 'Skip Kitchen'}
+                  </span>
                 </div>
               </div>
 
-              {/* Itemized Cart List */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+              {/* SECTION 2: Itemized Cart List (Scrolls Independently) */}
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-2">
                 <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-                  <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    Billed Items ({cartItems.reduce((acc, c) => acc + c.quantity, 0)})
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
+                    Order Items ({cartItems.reduce((acc, c) => acc + c.quantity, 0)})
                   </span>
                   {cartItems.length > 0 && (
                     <button
@@ -842,95 +910,38 @@ export const ManualBillingModal = ({
                 </div>
 
                 {cartItems.length === 0 ? (
-                  <div className="py-16 text-center text-slate-400 space-y-2">
-                    <p className="text-xs font-bold text-slate-500">Cart is empty</p>
+                  <div className="py-12 text-center text-slate-400 space-y-1.5">
+                    <p className="text-xs font-bold text-slate-600">Cart is empty</p>
                     <p className="text-[11px] max-w-xs mx-auto text-slate-400">
-                      Tap items on the left to add them to this manual bill.
+                      Tap any menu item on the left to add it to this manual bill.
                     </p>
                   </div>
                 ) : (
-                  cartItems.map((item, idx) => {
-                    const lineTotal = (item.sellingPrice || item.price) * item.quantity;
-                    return (
-                      <div
-                        key={idx}
-                        className="bg-slate-50/80 rounded-xl p-2.5 border border-slate-200/80 space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <CustomerVegBadge type={item.foodType} />
-                            <span className="font-extrabold text-xs text-slate-900 truncate">
-                              {item.itemName}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Quantity Controls with direct input */}
-                            <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(idx, item.quantity - 1)}
-                                className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100"
-                              >
-                                <FiMinus className="w-2.5 h-2.5" />
-                              </button>
-                              <input
-                                type="number"
-                                min="1"
-                                max="99"
-                                value={item.quantity}
-                                onChange={(e) => handleUpdateQuantity(idx, e.target.value)}
-                                className="w-8 text-center text-xs font-black bg-transparent focus:outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQuantity(idx, item.quantity + 1)}
-                                className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-100"
-                              >
-                                <FiPlus className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-
-                            <span className="text-xs font-black text-slate-900 w-16 text-right">
-                              {formatCurrency(lineTotal)}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(idx)}
-                              className="text-slate-400 hover:text-rose-500 p-1"
-                            >
-                              <FiTrash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Item Notes input (e.g. Less spicy, extra cheese) */}
-                        <input
-                          type="text"
-                          placeholder="Item notes (e.g. Less spicy, no onion)..."
-                          value={item.notes}
-                          onChange={(e) => handleUpdateItemNotes(idx, e.target.value)}
-                          className="w-full text-[11px] px-2.5 py-1 rounded-md bg-white border border-slate-200/90 text-slate-600 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-[#16A34A]"
-                        />
-                      </div>
-                    );
-                  })
+                  cartItems.map((item, idx) => (
+                    <PosOrderItem
+                      key={`${item.itemId || item.menuItemId}-${idx}`}
+                      item={item}
+                      index={idx}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onUpdateNotes={handleUpdateItemNotes}
+                      onRemove={handleRemoveItem}
+                    />
+                  ))
                 )}
               </div>
 
-              {/* Financial Breakdown & Discounts */}
-              <div className="p-4 border-t border-slate-200 space-y-2.5 bg-slate-50/70 shrink-0 text-xs">
-                {/* Discount Row */}
+              {/* SECTIONS 3 & 4 + BOTTOM ACTIONS: Financials & Payment (Sticky Bottom) */}
+              <div className="p-3.5 border-t border-slate-200 space-y-2.5 bg-slate-50/80 shrink-0 text-xs">
+                {/* SECTION 3: Bill Discount Selector */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-slate-600 font-semibold flex items-center gap-1">
+                  <span className="text-slate-600 font-bold flex items-center gap-1 text-[11px]">
                     <FiTag className="w-3.5 h-3.5 text-amber-600" /> Bill Discount:
                   </span>
                   <div className="flex items-center gap-1.5">
                     <select
                       value={discountType}
                       onChange={(e) => setDiscountType(e.target.value)}
-                      className="text-[11px] px-2 py-1 rounded bg-white border border-slate-200 font-bold"
+                      className="text-[11px] px-2 py-1 rounded-lg bg-white border border-slate-200 font-bold text-slate-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-slate-900"
                     >
                       <option value="none">None</option>
                       <option value="flat">Flat ₹</option>
@@ -943,128 +954,87 @@ export const ManualBillingModal = ({
                         value={discountValue}
                         onChange={(e) => setDiscountValue(Number(e.target.value) || 0)}
                         placeholder="Value"
-                        className="w-16 text-xs px-2 py-1 rounded bg-white border border-slate-200 font-bold text-right"
+                        className="w-16 text-xs px-2 py-1 rounded-lg bg-white border border-slate-200 font-bold text-right text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                       />
                     )}
                   </div>
                 </div>
 
-                {/* Subtotals & Taxes */}
+                {/* Subtotals & Taxes Hierarchy */}
                 <div className="space-y-1 pt-1 border-t border-slate-200/80 text-[11px]">
                   <div className="flex justify-between text-slate-600">
                     <span>Subtotal:</span>
-                    <span className="font-bold">{formatCurrency(calculations.subtotal)}</span>
+                    <span className="font-bold text-slate-900 font-mono">
+                      {formatCurrency(calculations.subtotal)}
+                    </span>
                   </div>
 
                   {calculations.totalDiscount > 0 && (
                     <div className="flex justify-between text-emerald-700 font-bold">
-                      <span>Total Discount:</span>
-                      <span>-{formatCurrency(calculations.totalDiscount)}</span>
+                      <span>Discount Savings:</span>
+                      <span className="font-mono">-{formatCurrency(calculations.totalDiscount)}</span>
                     </div>
                   )}
 
                   {calculations.gstAmount > 0 && (
                     <div className="flex justify-between text-slate-600">
                       <span>GST ({calculations.gstRate}%):</span>
-                      <span className="font-bold">{formatCurrency(calculations.gstAmount)}</span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {formatCurrency(calculations.gstAmount)}
+                      </span>
                     </div>
                   )}
 
                   {calculations.serviceChargeAmount > 0 && (
                     <div className="flex justify-between text-slate-600">
                       <span>Service Charge ({calculations.serviceRate}%):</span>
-                      <span className="font-bold">
+                      <span className="font-bold text-slate-900 font-mono">
                         {formatCurrency(calculations.serviceChargeAmount)}
                       </span>
                     </div>
                   )}
 
-                  <div className="flex justify-between items-center text-sm font-black pt-1.5 border-t border-slate-300 text-slate-900">
-                    <span>GRAND TOTAL:</span>
-                    <span className="text-base text-[#16A34A]">
+                  {calculations.packagingCharge > 0 && (
+                    <div className="flex justify-between text-slate-600">
+                      <span>Packaging Charge:</span>
+                      <span className="font-bold text-slate-900 font-mono">
+                        {formatCurrency(calculations.packagingCharge)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Grand Total: Dominant Typography */}
+                  <div className="flex justify-between items-baseline pt-2 mt-1 border-t border-slate-300">
+                    <span className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                      Grand Total
+                    </span>
+                    <span className="text-2xl font-black text-slate-900 tracking-tight font-mono">
                       {formatCurrency(calculations.grandTotal)}
                     </span>
                   </div>
                 </div>
 
-                {/* Payment Mode Selector */}
-                <div className="pt-2 border-t border-slate-200 space-y-1.5">
-                  <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider block">
-                    Payment Mode
-                  </span>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {['cash', 'upi', 'card', 'split'].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setPaymentMethod(m)}
-                        className={`py-1.5 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
-                          paymentMethod === m
-                            ? 'bg-[#16A34A] text-white shadow-xs'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
+                {/* SECTION 4: Payment Selector */}
+                <PosPaymentSelector
+                  paymentMethod={paymentMethod}
+                  onSelectPaymentMethod={setPaymentMethod}
+                  splitCash={splitCash}
+                  onSplitCashChange={setSplitCash}
+                  splitUpi={splitUpi}
+                  onSplitUpiChange={setSplitUpi}
+                  splitCard={splitCard}
+                  onSplitCardChange={setSplitCard}
+                  grandTotal={calculations.grandTotal}
+                />
 
-                  {/* Split Payment inputs if Split selected */}
-                  {paymentMethod === 'split' && (
-                    <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1.5 text-xs">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="text-[10px] text-slate-500 font-bold block">Cash (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={splitCash}
-                            onChange={(e) => setSplitCash(Number(e.target.value) || 0)}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-slate-500 font-bold block">UPI (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={splitUpi}
-                            onChange={(e) => setSplitUpi(Number(e.target.value) || 0)}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded font-bold"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-slate-500 font-bold block">Card (₹)</label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={splitCard}
-                            onChange={(e) => setSplitCard(Number(e.target.value) || 0)}
-                            className="w-full text-xs p-1.5 border border-slate-200 rounded font-bold"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex justify-between text-[11px] pt-1">
-                        <span className="text-slate-500">Remaining to allocate:</span>
-                        <span
-                          className={`font-black ${
-                            Math.abs(splitRemaining) < 0.05 ? 'text-emerald-600' : 'text-rose-600'
-                          }`}
-                        >
-                          {formatCurrency(splitRemaining)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom Action Buttons */}
-                <div className="grid grid-cols-3 gap-2 pt-2">
+                {/* BOTTOM ACTIONS: Primary Generate Bill, Secondary Mark Paid, Text Save Draft */}
+                <div className="grid grid-cols-3 gap-2 pt-1">
                   <button
                     type="button"
                     disabled={submitting || cartItems.length === 0}
                     onClick={() => handleSubmitBill('save_draft')}
-                    className="py-2.5 px-3 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                    className="py-2.5 px-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                    title="Save Draft (Ctrl+S)"
                   >
                     Save Draft
                   </button>
@@ -1073,7 +1043,8 @@ export const ManualBillingModal = ({
                     type="button"
                     disabled={submitting || cartItems.length === 0}
                     onClick={() => handleSubmitBill('generate')}
-                    className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                    className="py-2.5 px-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs shadow-md shadow-slate-900/15 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                    title="Generate Bill (Ctrl+B)"
                   >
                     Generate Bill
                   </button>
@@ -1082,7 +1053,7 @@ export const ManualBillingModal = ({
                     type="button"
                     disabled={submitting || cartItems.length === 0}
                     onClick={() => handleSubmitBill('mark_paid')}
-                    className="py-2.5 px-3 rounded-xl bg-[#16A34A] hover:bg-[#15803d] text-white font-black text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                    className="py-2.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                   >
                     Mark Paid
                   </button>
@@ -1097,4 +1068,3 @@ export const ManualBillingModal = ({
 };
 
 export default ManualBillingModal;
-
