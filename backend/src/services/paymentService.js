@@ -40,7 +40,10 @@ export const createPaymentOrderService = async ({
   customerPhone = '',
   guestSessionId = '',
   // Prepay payload fields:
+  restaurantId,
   restaurantSlug,
+  tableId,
+  tableNumber,
   tableIdentifier,
   guestId,
   deviceId,
@@ -122,7 +125,7 @@ export const createPaymentOrderService = async ({
       throw error;
     }
 
-    const table = (await resolveRestaurantTable(restaurant._id, rawTable)) ||
+    table = (await resolveRestaurantTable(restaurant._id, rawTable)) ||
       (tableNumber ? await resolveRestaurantTable(restaurant._id, tableNumber) : null) ||
       (tableIdentifier ? await resolveRestaurantTable(restaurant._id, tableIdentifier) : null);
 

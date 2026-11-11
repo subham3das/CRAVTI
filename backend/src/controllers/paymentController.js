@@ -17,23 +17,18 @@ import env from '../config/env.js';
  * Customer creates Razorpay payment order for their active order or PREPAY cart checkout
  */
 export const createPaymentOrder = asyncHandler(async (req, res) => {
-  console.log('[Razorpay Flow] Incoming Payment Request:', {
-    restaurantSlug: req.body?.restaurantSlug,
-    tableId: req.body?.tableId || req.body?.tableIdentifier,
-    guestSessionId: req.body?.guestSessionId || req.body?.sessionId,
-    itemCount: req.body?.items?.length,
-    paymentMethod: req.body?.paymentMethod,
-    orderId: req.body?.orderId,
-  });
+  console.log("Payment payload:", req.body);
 
   const {
+    restaurantId,
+    tableId,
+    tableNumber,
+    tableIdentifier,
     orderId,
     customerEmail,
     customerPhone,
     guestSessionId,
     restaurantSlug,
-    tableIdentifier,
-    tableId,
     guestId,
     deviceId,
     sessionId,
@@ -46,7 +41,7 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     grandTotal,
   } = req.body;
 
-  const effectiveTable = tableId || tableIdentifier;
+  const effectiveTable = tableId || tableIdentifier || tableNumber;
   const effectiveSessionId = guestSessionId || sessionId;
 
   if (!orderId && (!restaurantSlug || !items || !items.length)) {
@@ -60,13 +55,15 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
   }
 
   const orderData = await createPaymentOrderService({
+    restaurantId,
     orderId,
     customerEmail,
     customerPhone,
     guestSessionId: effectiveSessionId,
     restaurantSlug,
-    tableIdentifier: effectiveTable,
-    tableId: effectiveTable,
+    tableId: tableId || effectiveTable,
+    tableNumber,
+    tableIdentifier: tableIdentifier || effectiveTable,
     guestId,
     deviceId,
     sessionId: effectiveSessionId,
