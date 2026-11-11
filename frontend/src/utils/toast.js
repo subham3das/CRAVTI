@@ -61,3 +61,4 @@ export const toast = Object.assign(
 export const showToast = toast;
 
 export default toast;
+

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { QRCodeModel } from '../models/QRCode.js';
 import { Table } from '../models/Table.js';
+import { Payment } from '../models/Payment.js';
 
 /**
  * Production-Safe Database Index Migration
@@ -70,9 +71,43 @@ export const migrateDatabaseIndexes = async () => {
       }
     }
 
-    // Trigger Mongoose Schema Index Sync for QRCodeModel
+    // =========================================================================
+    // 2.5. PAYMENTS COLLECTION INDEX MIGRATION (razorpayOrderId partial unique index)
+    // =========================================================================
+    const hasPayments = collections.some((c) => c.name === 'payments');
+    if (hasPayments) {
+      const paymentIndexes = await db.collection('payments').indexes().catch(() => []);
+      const rzpOrderIdx = paymentIndexes.find((i) => i.name === 'razorpayOrderId_1');
+      const needsRzpOrderIdxMigration =
+        rzpOrderIdx &&
+        (!rzpOrderIdx.partialFilterExpression ||
+          !rzpOrderIdx.partialFilterExpression.razorpayOrderId ||
+          rzpOrderIdx.sparse === false);
+
+      if (needsRzpOrderIdxMigration) {
+        console.log('🔄 Migrating payments collection index: dropping legacy razorpayOrderId_1...');
+        await db.collection('payments').dropIndex('razorpayOrderId_1').catch(() => {});
+      }
+
+      const currentPaymentIndexes = await db.collection('payments').indexes().catch(() => []);
+      const existsNow = currentPaymentIndexes.some((i) => i.name === 'razorpayOrderId_1');
+      if (!existsNow) {
+        console.log('✅ Creating partial unique index on payments.razorpayOrderId (type: string, > "")...');
+        await db.collection('payments').createIndex(
+          { razorpayOrderId: 1 },
+          {
+            name: 'razorpayOrderId_1',
+            unique: true,
+            partialFilterExpression: { razorpayOrderId: { $type: 'string', $gt: '' } },
+          }
+        );
+      }
+    }
+
+    // Trigger Mongoose Schema Index Sync
     await QRCodeModel.syncIndexes();
     await Table.syncIndexes();
+    await Payment.syncIndexes();
 
     // =========================================================================
     // 3. BACKFILL ACTIVE TABLES TO QRCODES COLLECTION

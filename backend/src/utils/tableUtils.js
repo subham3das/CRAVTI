@@ -55,3 +55,4 @@ export const resolveRestaurantTable = async (restaurantId, rawIdentifier) => {
 export default {
   resolveRestaurantTable,
 };
+

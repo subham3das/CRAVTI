@@ -77,8 +77,7 @@ const paymentSchema = new mongoose.Schema(
     razorpayOrderId: {
       type: String,
       required: false,
-      sparse: true,
-      index: true,
+      default: undefined,
     },
     razorpayPaymentId: {
       type: String,
@@ -198,8 +197,30 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
+// Defensive hook: ensure manual/offline payments never store null, empty string, or whitespace in razorpayOrderId
+paymentSchema.pre('save', function (next) {
+  if (
+    this.razorpayOrderId === null ||
+    this.razorpayOrderId === undefined ||
+    this.razorpayOrderId === '' ||
+    typeof this.razorpayOrderId !== 'string' ||
+    !this.razorpayOrderId.trim()
+  ) {
+    this.razorpayOrderId = undefined;
+  }
+  next();
+});
+
 paymentSchema.index({ restaurantId: 1, status: 1, createdAt: -1 });
 paymentSchema.index({ restaurantId: 1, isDeleted: 1 });
+paymentSchema.index(
+  { razorpayOrderId: 1 },
+  {
+    name: 'razorpayOrderId_1',
+    unique: true,
+    partialFilterExpression: { razorpayOrderId: { $type: 'string', $gt: '' } },
+  }
+);
 
 export const Payment = mongoose.model('Payment', paymentSchema);
 export default Payment;
