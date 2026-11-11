@@ -17,6 +17,15 @@ import env from '../config/env.js';
  * Customer creates Razorpay payment order for their active order or PREPAY cart checkout
  */
 export const createPaymentOrder = asyncHandler(async (req, res) => {
+  console.log('[Razorpay Flow] Incoming Payment Request:', {
+    restaurantSlug: req.body?.restaurantSlug,
+    tableId: req.body?.tableId || req.body?.tableIdentifier,
+    guestSessionId: req.body?.guestSessionId || req.body?.sessionId,
+    itemCount: req.body?.items?.length,
+    paymentMethod: req.body?.paymentMethod,
+    orderId: req.body?.orderId,
+  });
+
   const {
     orderId,
     customerEmail,
@@ -41,6 +50,7 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
   const effectiveSessionId = guestSessionId || sessionId;
 
   if (!orderId && (!restaurantSlug || !items || !items.length)) {
+    console.warn('[Razorpay Flow] Validation failed: missing orderId or (restaurantSlug and items)');
     return sendError(
       res,
       'Either orderId or (restaurantSlug and items) is required to initialize payment',
@@ -69,6 +79,7 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     grandTotal,
   });
 
+  console.log('[Razorpay Flow] Response Sent successfully for Razorpay Order:', orderData.razorpayOrderId);
   return sendSuccess(res, 'Payment order created successfully', orderData, HTTP_STATUS.CREATED);
 });
 
@@ -78,6 +89,7 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
  */
 export const verifyPayment = asyncHandler(async (req, res) => {
   const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+  console.log('[Razorpay Flow] Verification Started for Razorpay Order:', { razorpayOrderId, razorpayPaymentId });
 
   const result = await verifyPaymentService({
     orderId,
@@ -86,6 +98,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     razorpaySignature,
   });
 
+  console.log('[Razorpay Flow] Verification Success:', { verified: result.verified, orderId: result.order?._id });
   return sendSuccess(res, 'Payment verified successfully', result, HTTP_STATUS.OK);
 });
 

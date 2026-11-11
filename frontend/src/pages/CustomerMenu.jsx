@@ -398,23 +398,52 @@ const CustomerMenuContent = () => {
           grandTotal: calculatedGrandTotal,
         };
 
-        const payRes = await createPaymentOrderApi(paymentPayload);
+        console.log('[Razorpay Flow] 1. Button Clicked (Online Payment)');
+        console.log('[Razorpay Flow] 2. Payload Built:', paymentPayload);
+        console.log('[Razorpay Flow] 3. API Started: POST /api/payment/create-order');
 
-        if (!payRes.success || !payRes.data) {
-          throw new Error(payRes.message || 'Failed to initialize payment gateway.');
+        // 20-second timeout with AbortController
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+        }, 20000);
+
+        let payRes;
+        try {
+          payRes = await createPaymentOrderApi(paymentPayload, {
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeoutId);
         }
+
+        console.log('[Razorpay Flow] 4. API Returned:', payRes);
+
+        if (!payRes || !payRes.success || !payRes.data) {
+          throw new Error(payRes?.message || 'Failed to initialize payment gateway.');
+        }
+
+        console.log('[Razorpay Flow] 5. Order Created:', payRes.data.razorpayOrderId);
+
+        // Step 7: Reset processing state BEFORE opening modal so button never hangs
+        setIsPlacingOrder(false);
+        isSubmittingRef.current = false;
 
         await openRazorpayModal({
           orderData: payRes.data,
           onSuccess: async (verifyPayload) => {
+            console.log('[Razorpay Flow] 6. Payment Success, Verification Started with payload:', verifyPayload);
+            setIsPlacingOrder(true);
             try {
               const vRes = await verifyPaymentApi({
                 razorpayOrderId: payRes.data.razorpayOrderId,
                 ...verifyPayload,
               });
 
+              console.log('[Razorpay Flow] 7. Verification Success:', vRes);
               if (vRes.success && (vRes.order || vRes.data?.order)) {
                 const confirmedOrder = vRes.order || vRes.data?.order;
+                console.log('[Razorpay Flow] 8. Order Created & Verified:', confirmedOrder._id);
                 clearCart();
                 setIsCartOpen(false);
                 setActiveOrder(confirmedOrder);
@@ -425,6 +454,7 @@ const CustomerMenuContent = () => {
                 toast.error(vRes.message || 'Payment verification failed.');
               }
             } catch (vErr) {
+              console.error('[Razorpay Flow] Verification Exception:', vErr);
               const errMsg = vErr.response?.data?.message || 'Payment verification failed.';
               toast.error(errMsg);
             } finally {
@@ -433,7 +463,7 @@ const CustomerMenuContent = () => {
             }
           },
           onDismiss: () => {
-            // Requirement 7: Do NOT create order. Do NOT clear cart. Keep checkout open. Show retry message.
+            console.log('[Razorpay Flow] Modal Dismissed by user');
             setIsPlacingOrder(false);
             isSubmittingRef.current = false;
             setIsCartOpen(true);
@@ -443,7 +473,7 @@ const CustomerMenuContent = () => {
             });
           },
           onError: (pErr) => {
-            // Requirement 7: Do NOT create order. Do NOT clear cart. Keep checkout open. Show retry message.
+            console.error('[Razorpay Flow] Payment Failed:', pErr);
             setIsPlacingOrder(false);
             isSubmittingRef.current = false;
             setIsCartOpen(true);
@@ -486,13 +516,17 @@ const CustomerMenuContent = () => {
         throw new Error(res.message || 'Failed to place cash order.');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Failed to place order. Please try again.';
+      console.error('[Razorpay Flow] Order placement exception:', err);
+      const isTimeout = err.name === 'AbortError' || err.code === 'ECONNABORTED';
+      const msg = isTimeout
+        ? 'Unable to initialize payment. Request timed out. Please try again.'
+        : (err.response?.data?.message || err.message || 'Failed to place order. Please try again.');
       toast.error(msg);
+      setIsCartOpen(true);
     } finally {
-      if (paymentMethod !== 'online') {
-        setIsPlacingOrder(false);
-        isSubmittingRef.current = false;
-      }
+      // Step 6 & 7: ALWAYS reset loading and submission ref so button never stays stuck
+      setIsPlacingOrder(false);
+      isSubmittingRef.current = false;
     }
   };
 

@@ -223,14 +223,14 @@ export const createPaymentOrderService = async ({
     };
   }
 
-  // Feature Flag Validation
-  const flags = await FeatureFlags.findOne({ restaurantId: restaurant._id });
-  const isOnlinePaymentEnabled =
-    flags?.onlinePaymentsEnabled !== false &&
-    flags?.onlinePaymentEnabled !== false &&
-    restaurant.paymentEnabled === true;
+  // Feature Flag Validation: Online payments are active unless explicitly disabled
+  const flags = await FeatureFlags.findOne({ restaurantId: restaurant._id }).lean();
+  const isOnlinePaymentDisabled =
+    flags?.onlinePaymentsEnabled === false ||
+    flags?.onlinePaymentEnabled === false ||
+    restaurant.isDeleted === true;
 
-  if (!isOnlinePaymentEnabled) {
+  if (isOnlinePaymentDisabled) {
     const error = new Error('Online payments are currently disabled for this restaurant. Please pay via Cash/Counter.');
     error.statusCode = 403;
     throw error;
@@ -242,21 +242,31 @@ export const createPaymentOrderService = async ({
     throw error;
   }
 
+  console.log('[Razorpay Flow] Creating Razorpay Order with amount:', amountInPaise, 'currency: INR');
   const razorpay = getRazorpayInstance();
 
   // Call Razorpay API to create order
-  const rzpOrder = await razorpay.orders.create({
-    amount: amountInPaise,
-    currency: 'INR',
-    receipt: receiptIdentifier,
-    notes: {
-      isPrepay: prepayPayload ? 'true' : 'false',
-      orderId: order ? order._id.toString() : '',
-      restaurantId: restaurant._id.toString(),
-      orderNumber: order?.orderNumber || '',
-      tableNumber: String(order ? order.tableNumber : table?.tableNumber || ''),
-    },
-  });
+  let rzpOrder;
+  try {
+    rzpOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: receiptIdentifier,
+      notes: {
+        isPrepay: prepayPayload ? 'true' : 'false',
+        orderId: order ? order._id.toString() : '',
+        restaurantId: restaurant._id.toString(),
+        orderNumber: order?.orderNumber || '',
+        tableNumber: String(order ? order.tableNumber : table?.tableNumber || ''),
+      },
+    });
+    console.log('[Razorpay Flow] Order Created Successfully:', rzpOrder.id);
+  } catch (rzpErr) {
+    console.error('[Razorpay Flow] Exception in razorpay.orders.create:', rzpErr);
+    const error = new Error(rzpErr.error?.description || rzpErr.message || 'Razorpay order creation failed.');
+    error.statusCode = rzpErr.statusCode || 500;
+    throw error;
+  }
 
   // Record or update Payment model in MongoDB
   const payment = new Payment({

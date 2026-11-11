@@ -4,13 +4,13 @@ import { api, publicApi } from './api';
  * Customer / Public Payment APIs (No auth headers or cookies)
  * Forwards full payload (orderId, restaurantSlug, tableId, guestSessionId, items, paymentMethod, etc.)
  */
-export const createPaymentOrderApi = async (payload = {}) => {
-  const response = await publicApi.post('/payment/create-order', payload);
+export const createPaymentOrderApi = async (payload = {}, config = {}) => {
+  const response = await publicApi.post('/payment/create-order', payload, config);
   return response.data;
 };
 
-export const verifyPaymentApi = async (payload = {}) => {
-  const response = await publicApi.post('/payment/verify', payload);
+export const verifyPaymentApi = async (payload = {}, config = {}) => {
+  const response = await publicApi.post('/payment/verify', payload, config);
   return response.data;
 };
 
