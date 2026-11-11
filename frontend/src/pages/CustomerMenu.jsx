@@ -26,6 +26,7 @@ import { CustomerCartDrawer } from '../components/customer/CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from '../components/customer/CustomerOrderSuccessModal';
 import { CustomerFooter } from '../components/customer/CustomerFooter';
 import { ImageWithFallback } from '../components/ImageWithFallback';
+import { getImageUrl } from '../utils/image';
 import {
   getOrCreateGuestId,
   getOrCreateDeviceId,
@@ -368,7 +369,7 @@ const CustomerMenuContent = () => {
         specialInstructions: i.specialInstructions?.trim() || '',
         discount: Number(i.discount) || 0,
         foodType: i.foodType || 'veg',
-        image: i.image?.url || i.image || '',
+        image: getImageUrl(i.image),
       }));
 
       // FLOW A: ONLINE PAYMENT (PREPAY)
@@ -645,7 +646,7 @@ const CustomerMenuContent = () => {
           {/* Logo & Restaurant Info */}
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <ImageWithFallback
-              src={restaurant?.logo?.url}
+              src={getImageUrl(restaurant?.logo)}
               alt={restaurant?.restaurantName}
               type="logo"
               className="w-10 h-10 rounded-xl object-cover border border-slate-100 shadow-2xs shrink-0"

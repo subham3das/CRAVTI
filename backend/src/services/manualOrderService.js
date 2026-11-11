@@ -10,6 +10,7 @@ import { getNextOrderNumber } from '../models/Counter.js';
 import { generateReceiptSnapshot } from './orderService.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
+import { getImageUrl } from '../utils/imageUtils.js';
 
 export const sanitizeManualOrder = (order) => {
   if (!order) return order;
@@ -56,7 +57,7 @@ const calculateManualBillTotals = (items, billDiscount = {}, settings = {}) => {
       quantity: qty,
       specialInstructions: item.notes || item.specialInstructions || '',
       foodType: item.foodType || 'veg',
-      image: item.image || '',
+      image: getImageUrl(item.image),
     };
   });
 
@@ -531,7 +532,7 @@ export const updateManualOrderService = async ({ restaurantId, user, orderId, pa
         notes: reqItem.notes || reqItem.specialInstructions || '',
         specialInstructions: reqItem.notes || reqItem.specialInstructions || '',
         foodType: dbItem?.foodType || reqItem.foodType || 'veg',
-        image: dbItem?.image?.url || reqItem.image || '',
+        image: getImageUrl(dbItem?.image || reqItem.image),
       };
     });
 
@@ -626,37 +627,50 @@ export const markManualOrderPaidService = async ({
     }
   }
 
-  order.status = 'completed';
-  order.cashierStatus = 'paid';
-  order.paymentStatus = paymentMethod === 'cash' ? 'paid_cash' : 'paid_online';
-  order.paymentMethod = paymentMethod;
-  if (paymentMethod === 'split') {
-    order.splitPayments = splitPayments;
-  }
-  order.paidAt = new Date();
-  order.statusHistory.push({
+  const updateFields = {
     status: 'completed',
-    timestamp: new Date(),
+    cashierStatus: 'paid',
+    paymentStatus: paymentMethod === 'cash' ? 'paid_cash' : 'paid_online',
+    paymentMethod,
+    paidAt: new Date(),
     updatedBy: user?.name || 'cashier',
-    note: `Marked paid via ${paymentMethod.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
-  });
+  };
+  if (paymentMethod === 'split') {
+    updateFields.splitPayments = splitPayments;
+  }
 
-  await order.save();
+  const updatedOrder = await Order.findByIdAndUpdate(
+    order._id,
+    {
+      $set: updateFields,
+      $push: {
+        statusHistory: {
+          status: 'completed',
+          timestamp: new Date(),
+          updatedBy: user?.name || 'cashier',
+          note: `Marked paid via ${paymentMethod.toUpperCase()}${notes ? ` - ${notes}` : ''}`,
+        },
+      },
+    },
+    { new: true }
+  );
+
+  const activeOrder = updatedOrder || order;
 
   // Create Payment Record
   const payment = new Payment({
     restaurantId: restId,
-    orderId: order._id,
-    tableId: order.tableId,
-    amount: order.grandTotal,
+    orderId: activeOrder._id,
+    tableId: activeOrder.tableId,
+    amount: activeOrder.grandTotal,
     currency: 'INR',
     status: 'captured',
     method: paymentMethod,
     paymentSource: 'MANUAL',
     cashierId: user?._id || null,
-    splitPayments: order.splitPayments,
+    splitPayments: activeOrder.splitPayments,
     notes: {
-      orderNumber: order.orderNumber,
+      orderNumber: activeOrder.orderNumber,
       cashier: user?.name || 'Cashier',
       method: paymentMethod,
       notes,
@@ -668,23 +682,23 @@ export const markManualOrderPaidService = async ({
         status: 'captured',
         actor: user?.name || 'cashier',
         timestamp: new Date(),
-        details: { paymentMethod, amount: order.grandTotal },
+        details: { paymentMethod, amount: activeOrder.grandTotal },
       },
     ],
   });
   await payment.save();
 
   // Generate Receipt Snapshot
-  const receipt = await generateReceiptSnapshot(order._id);
+  const receipt = await generateReceiptSnapshot(activeOrder._id);
 
   try {
-    emitToRestaurant(restId, 'manual-order-updated', { order, receipt });
-    emitToRestaurant(restId, 'order-updated', order);
+    emitToRestaurant(restId, 'manual-order-updated', { order: activeOrder, receipt });
+    emitToRestaurant(restId, 'order-updated', activeOrder);
   } catch (e) {
     console.warn('Socket note:', e.message);
   }
 
-  return { order: sanitizeManualOrder(order), receipt };
+  return { order: sanitizeManualOrder(activeOrder), receipt };
 };
 
 /**

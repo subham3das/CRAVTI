@@ -2,6 +2,7 @@ import { MenuItem } from '../models/MenuItem.js';
 import { Category } from '../models/Category.js';
 import { uploadImageToCloudinary, deleteImageFromCloudinary } from './cloudinaryService.js';
 import { calculateSellingPrice } from '../utils/discountCalculator.js';
+import { normalizeImage } from '../utils/imageUtils.js';
 
 export const getMenuItemsService = async (restaurantId, query = {}) => {
   const {
@@ -96,7 +97,9 @@ export const createMenuItemService = async (restaurantId, data, imageFile) => {
   let imageData = { url: '', public_id: '' };
   if (imageFile) {
     const uploaded = await uploadImageToCloudinary(imageFile, 'craviti/menu');
-    if (uploaded) imageData = uploaded;
+    if (uploaded) imageData = normalizeImage(uploaded);
+  } else if (data.image) {
+    imageData = normalizeImage(data.image);
   }
 
   const item = await MenuItem.create({
@@ -164,7 +167,11 @@ export const updateMenuItemService = async (restaurantId, itemId, data, imageFil
       await deleteImageFromCloudinary(item.image.public_id);
     }
     const uploaded = await uploadImageToCloudinary(imageFile, 'craviti/menu');
-    if (uploaded) item.image = uploaded;
+    if (uploaded) item.image = normalizeImage(uploaded);
+  } else if (data.image !== undefined) {
+    item.image = normalizeImage(data.image);
+  } else if (item.image) {
+    item.image = normalizeImage(item.image);
   }
 
   await item.save();

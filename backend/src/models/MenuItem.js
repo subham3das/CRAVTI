@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { normalizeImage } from '../utils/imageUtils.js';
 
 const menuItemSchema = new mongoose.Schema(
   {
@@ -27,14 +28,18 @@ const menuItemSchema = new mongoose.Schema(
       maxlength: [500, 'Description cannot exceed 500 characters'],
     },
     image: {
-      url: {
-        type: String,
-        default: '',
+      type: {
+        url: {
+          type: String,
+          default: '',
+        },
+        public_id: {
+          type: String,
+          default: '',
+        },
       },
-      public_id: {
-        type: String,
-        default: '',
-      },
+      default: () => ({ url: '', public_id: '' }),
+      set: (val) => normalizeImage(val),
     },
     price: {
       type: Number,
@@ -106,6 +111,22 @@ menuItemSchema.index({ restaurantId: 1, itemName: 1 });
 menuItemSchema.index({ restaurantId: 1, categoryId: 1, isDeleted: 1 });
 menuItemSchema.index({ restaurantId: 1, availability: 1, isDeleted: 1 });
 menuItemSchema.index({ restaurantId: 1, isDeleted: 1, createdAt: -1 });
+
+// Migration layer: ensure legacy docs with string image convert to { url, public_id } seamlessly
+menuItemSchema.post('init', function (doc) {
+  if (doc && typeof doc.image === 'string') {
+    doc.image = { url: doc.image, public_id: '' };
+  } else if (doc && (!doc.image || typeof doc.image !== 'object')) {
+    doc.image = { url: '', public_id: '' };
+  }
+});
+
+menuItemSchema.pre('save', function (next) {
+  if (this.image) {
+    this.image = normalizeImage(this.image);
+  }
+  next();
+});
 
 export const MenuItem = mongoose.model('MenuItem', menuItemSchema);
 

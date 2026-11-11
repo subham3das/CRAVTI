@@ -4,6 +4,7 @@ import { FiPlus, FiMinus, FiClock, FiStar, FiThumbsUp } from 'react-icons/fi';
 import { CustomerVegBadge } from './CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
 import { ImageWithFallback } from '../ImageWithFallback';
+import { getImageUrl } from '../../utils/image';
 
 export const CustomerMenuCard = React.memo(
   ({
@@ -116,7 +117,7 @@ export const CustomerMenuCard = React.memo(
         <div className="w-24 sm:w-28 shrink-0 flex flex-col justify-between items-center self-stretch">
           <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden relative bg-slate-50 border border-slate-100 shadow-2xs shrink-0">
             <ImageWithFallback
-              src={item?.image?.url}
+              src={getImageUrl(item?.image)}
               alt={item?.itemName}
               type="menu"
               className="w-full h-full object-cover rounded-xl transition-transform duration-300 hover:scale-105"

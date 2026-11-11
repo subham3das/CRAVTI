@@ -12,6 +12,7 @@ import { getNextOrderNumber, getNextReceiptNumber } from '../models/Counter.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { calculateSellingPrice } from '../utils/discountCalculator.js';
+import { getImageUrl } from '../utils/imageUtils.js';
 
 /**
  * Helper to release table status to 'available' if no other active orders exist on that table
@@ -556,7 +557,7 @@ export const placeOrderService = async (payload) => {
       sellingPrice,
       quantity: qty,
       specialInstructions: requestedItem.specialInstructions?.trim() || '',
-      image: dbItem.image?.url || '',
+      image: getImageUrl(dbItem.image),
       foodType: dbItem.foodType || 'veg',
     });
   }

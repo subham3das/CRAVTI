@@ -31,6 +31,7 @@ import { ImageWithFallback } from '../ImageWithFallback';
 import { CustomerVegBadge } from '../customer/CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
 import { safeString, safeTrim, safeLower } from '../../utils/string';
+import { getImageUrl } from '../../utils/image';
 import toast from 'react-hot-toast';
 
 export const ManualBillingModal = ({
@@ -159,7 +160,7 @@ export const ManualBillingModal = ({
             quantity: Math.max(1, parseInt(i.quantity, 10) || 1),
             notes: i.specialInstructions || i.notes || '',
             foodType: i.foodType || 'veg',
-            image: i.image?.url || i.image || '',
+            image: getImageUrl(i.image),
           }))
         );
       }
@@ -236,7 +237,7 @@ export const ManualBillingModal = ({
           quantity: 1,
           notes: '',
           foodType: item.foodType || 'veg',
-          image: item.image?.url || item.image || '',
+          image: getImageUrl(item.image),
         },
       ]);
     }
@@ -366,7 +367,6 @@ export const ManualBillingModal = ({
         quantity: c.quantity,
         notes: c.notes || '',
         foodType: c.foodType,
-        image: c.image,
       })),
       billDiscount: {
         type: discountType,
@@ -641,7 +641,7 @@ export const ManualBillingModal = ({
                           <div className="flex gap-3">
                             <div className="w-16 h-16 rounded-lg overflow-hidden relative bg-slate-100 shrink-0 border border-slate-100">
                               <ImageWithFallback
-                                src={typeof item.image === 'string' ? item.image : (item.image?.url || '')}
+                                src={getImageUrl(item.image)}
                                 alt={safeString(item.itemName)}
                                 type="menu"
                                 className="w-full h-full object-cover"

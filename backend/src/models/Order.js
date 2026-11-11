@@ -42,6 +42,15 @@ const orderItemSchema = new mongoose.Schema(
     image: {
       type: String,
       default: '',
+      set: function (val) {
+        if (!val) return '';
+        if (typeof val === 'string') return val.trim();
+        if (typeof val === 'object') {
+          if (val.url && typeof val.url === 'string') return val.url.trim();
+          return '';
+        }
+        return String(val || '').trim();
+      },
     },
     foodType: {
       type: String,
@@ -286,5 +295,16 @@ orderSchema.index({ restaurantId: 1, orderSource: 1, createdAt: -1 });
 orderSchema.index({ restaurantId: 1, tableId: 1, status: 1 });
 orderSchema.index({ restaurantId: 1, guestId: 1 });
 orderSchema.index({ restaurantId: 1, paymentStatus: 1 });
+
+// Ensure legacy/corrupt order item images convert cleanly to string on retrieval
+orderSchema.post('init', function (doc) {
+  if (doc && Array.isArray(doc.items)) {
+    for (const item of doc.items) {
+      if (item && typeof item.image === 'object' && item.image !== null) {
+        item.image = typeof item.image.url === 'string' ? item.image.url : '';
+      }
+    }
+  }
+});
 
 export const Order = mongoose.model('Order', orderSchema);

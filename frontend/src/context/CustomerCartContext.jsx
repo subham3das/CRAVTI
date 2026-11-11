@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { safeNumber } from '../utils/formatters';
+import { getImageUrl } from '../utils/image';
 
 const CustomerCartContext = createContext(null);
 
@@ -51,7 +52,7 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
           sellingPrice,
           quantity: Math.max(1, quantity),
           specialInstructions,
-          image: item.image?.url || '',
+          image: getImageUrl(item.image),
           foodType: item.foodType || 'veg',
         },
       ];
@@ -118,7 +119,7 @@ export const CustomerCartProvider = ({ children, storageKey = 'craviti_cart' }) 
         const currentPrice = safeNumber(liveItem.price);
         const currentSellingPrice = safeNumber(liveItem.sellingPrice) || currentPrice;
         const currentName = liveItem.itemName || cartItem.name;
-        const currentImage = liveItem.image?.url || cartItem.image;
+        const currentImage = getImageUrl(liveItem.image) || cartItem.image;
 
         if (
           cartItem.price !== currentPrice ||

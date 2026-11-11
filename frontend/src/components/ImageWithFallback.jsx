@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FiImage, FiUser } from 'react-icons/fi';
 import { MdOutlineRestaurant, MdQrCode2 } from 'react-icons/md';
+import { getImageUrl } from '../utils/image';
 
 /**
  * ImageWithFallback (Standard 5)
@@ -17,12 +18,7 @@ export const ImageWithFallback = ({
 }) => {
   const [hasError, setHasError] = useState(false);
 
-  const resolvedSrc = typeof src === 'string'
-    ? src.trim()
-    : (src && typeof src === 'object' && typeof src.url === 'string')
-    ? src.url.trim()
-    : '';
-
+  const resolvedSrc = getImageUrl(src);
   const isInvalidSrc = !resolvedSrc || resolvedSrc === '' || resolvedSrc.includes('undefined') || resolvedSrc.includes('null');
 
   if (hasError || isInvalidSrc) {

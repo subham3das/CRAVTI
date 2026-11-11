@@ -11,6 +11,7 @@ import { Pagination } from '../components/Pagination';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { MenuItemModal } from '../components/MenuItemModal';
 import { ImageWithFallback } from '../components/ImageWithFallback';
+import { getImageUrl } from '../utils/image';
 import { useDebounce } from '../hooks/useDebounce';
 import { formatCurrency } from '../utils/formatters';
 import {
@@ -423,7 +424,7 @@ export const Menu = () => {
                           <div className="flex items-center gap-3">
                             <div className="relative w-12 h-12 rounded-lg bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
                               <ImageWithFallback
-                                src={item?.image?.url}
+                                src={getImageUrl(item?.image)}
                                 alt={item?.itemName}
                                 type="menu"
                                 className="w-full h-full object-cover"
@@ -567,7 +568,7 @@ export const Menu = () => {
                 <div className="flex items-start gap-3">
                   <div className="relative w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
                     <ImageWithFallback
-                      src={item?.image?.url}
+                      src={getImageUrl(item?.image)}
                       alt={item?.itemName}
                       type="menu"
                       className="w-full h-full object-cover"

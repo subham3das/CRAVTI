@@ -4,6 +4,7 @@ import { FiX, FiPlus, FiMinus, FiClock, FiStar, FiThumbsUp } from 'react-icons/f
 import { CustomerVegBadge } from './CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
 import { ImageWithFallback } from '../ImageWithFallback';
+import { getImageUrl } from '../../utils/image';
 
 export const CustomerItemModal = ({
   item,
@@ -60,7 +61,7 @@ export const CustomerItemModal = ({
           {/* Large Hero Image */}
           <div className="h-56 w-full relative bg-slate-100 shrink-0">
             <ImageWithFallback
-              src={item?.image?.url}
+              src={getImageUrl(item?.image)}
               alt={item?.itemName}
               type="menu"
               className="w-full h-full object-cover"

@@ -14,6 +14,7 @@ import { generateReceiptSnapshot } from './orderService.js';
 import { emitSyncEvent, emitToOrder, emitToRestaurant, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { createRestaurantNotification, createAdminNotification } from './notificationService.js';
+import { getImageUrl } from '../utils/imageUtils.js';
 
 /**
  * Constant helper for timing-safe string comparison
@@ -175,7 +176,7 @@ export const createPaymentOrderService = async ({
         sellingPrice,
         quantity: qty,
         specialInstructions: requestedItem.specialInstructions?.trim() || '',
-        image: dbItem.image?.url || '',
+        image: getImageUrl(dbItem.image),
         foodType: dbItem.foodType || 'veg',
       });
 

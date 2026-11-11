@@ -5,6 +5,7 @@ import { Input } from './Input';
 import { Button } from './Button';
 import { FoodTypeBadge } from './FoodTypeBadge';
 import { formatCurrency } from '../utils/formatters';
+import { getImageUrl } from '../utils/image';
 import { FiUploadCloud, FiX, FiClock, FiStar, FiThumbsUp, FiTag } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -66,7 +67,7 @@ export const MenuItemModal = ({
         recommended: editingItem.recommended || false,
         displayOrder: editingItem.displayOrder || 0,
       });
-      setImagePreview(editingItem.image?.url || null);
+      setImagePreview(getImageUrl(editingItem.image) || null);
       setImageFile(null);
     } else {
       reset({
