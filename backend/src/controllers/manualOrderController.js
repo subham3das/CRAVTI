@@ -24,11 +24,13 @@ export const createManualOrder = asyncHandler(async (req, res) => {
     payload: req.body,
   });
 
+  const order = result?.order || result;
   return sendSuccess(
     res,
     result.message || 'Manual order processed successfully',
-    result,
-    HTTP_STATUS.CREATED
+    { order, receipt: result.receipt },
+    HTTP_STATUS.CREATED,
+    { order, receipt: result.receipt }
   );
 });
 
@@ -70,7 +72,14 @@ export const updateManualOrder = asyncHandler(async (req, res) => {
     payload: req.body,
   });
 
-  return sendSuccess(res, result.message || 'Manual order updated successfully', result, HTTP_STATUS.OK);
+  const order = result?.order || result;
+  return sendSuccess(
+    res,
+    result?.message || 'Manual order updated successfully',
+    { order },
+    HTTP_STATUS.OK,
+    { order }
+  );
 });
 
 /**
@@ -90,7 +99,14 @@ export const markManualOrderPaid = asyncHandler(async (req, res) => {
     splitPayments,
   });
 
-  return sendSuccess(res, result.message || 'Bill settled successfully', result, HTTP_STATUS.OK);
+  const order = result?.order || result;
+  return sendSuccess(
+    res,
+    result?.message || 'Bill settled successfully',
+    { order, receipt: result?.receipt },
+    HTTP_STATUS.OK,
+    { order, receipt: result?.receipt }
+  );
 });
 
 /**

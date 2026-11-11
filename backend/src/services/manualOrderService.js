@@ -584,7 +584,8 @@ export const updateManualOrderService = async ({ restaurantId, user, orderId, pa
     console.warn('Socket note:', e.message);
   }
 
-  return sanitizeManualOrder(order);
+  const sanitized = sanitizeManualOrder(order);
+  return { order: sanitized, ...sanitized };
 };
 
 /**

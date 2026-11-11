@@ -40,3 +40,41 @@ export const setGuestId = (guestId) => {
     localStorage.setItem('craviti_guest_id', guestId);
   }
 };
+
+/**
+ * Table Session Persistence across navigation, refreshes, and checkout
+ */
+export const saveTableSession = ({ restaurantId, restaurantSlug, tableId, tableNumber, tableName } = {}) => {
+  try {
+    const session = {
+      restaurantId: restaurantId ? String(restaurantId) : '',
+      restaurantSlug: restaurantSlug ? String(restaurantSlug) : '',
+      tableId: tableId ? String(tableId) : '',
+      tableNumber: tableNumber != null ? String(tableNumber) : '',
+      tableName: tableName ? String(tableName) : '',
+      savedAt: Date.now(),
+    };
+    sessionStorage.setItem('craviti_table_session', JSON.stringify(session));
+    localStorage.setItem('craviti_last_table', JSON.stringify(session));
+  } catch {
+    /* ignore storage errors */
+  }
+};
+
+export const getTableSession = () => {
+  try {
+    const raw = sessionStorage.getItem('craviti_table_session') || localStorage.getItem('craviti_last_table');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const clearTableSession = () => {
+  try {
+    sessionStorage.removeItem('craviti_table_session');
+    localStorage.removeItem('craviti_last_table');
+  } catch {
+    /* ignore */
+  }
+};

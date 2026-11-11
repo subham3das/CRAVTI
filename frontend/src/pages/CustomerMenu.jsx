@@ -33,6 +33,8 @@ import {
   getOrCreateSessionId,
   regenerateSessionId,
   setGuestId,
+  saveTableSession,
+  getTableSession,
 } from '../utils/guestSession';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
@@ -42,7 +44,12 @@ const CustomerMenuContent = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const activeTable = tableNumber || tableId || '1';
+  const queryTable = searchParams.get('table') || searchParams.get('tableNumber') || searchParams.get('tableId');
+  const storedSession = getTableSession();
+  const fallbackStoredTable = storedSession && storedSession.restaurantSlug === restaurantSlug
+    ? (storedSession.tableNumber || storedSession.tableId)
+    : null;
+  const activeTable = tableNumber || tableId || queryTable || fallbackStoredTable || '1';
   const activeToken = qrToken || searchParams.get('token') || searchParams.get('qrToken') || '';
 
   const {
@@ -134,6 +141,15 @@ const CustomerMenuContent = () => {
 
           setRestaurant(restaurantData);
           setTable(tableData);
+          if (tableData) {
+            saveTableSession({
+              restaurantId: restaurantData?._id,
+              restaurantSlug,
+              tableId: tableData._id,
+              tableNumber: tableData.tableNumber,
+              tableName: tableData.tableName,
+            });
+          }
           setCategories(categoriesData);
           setMenuItems(liveItems);
           setSettings(settingsData);
@@ -321,8 +337,10 @@ const CustomerMenuContent = () => {
     if (isSubmittingRef.current || isPlacingOrder) return;
 
     // Resolve required identifiers
-    const effectiveSlug = (restaurantSlug || restaurant?.slug || '').trim();
-    const effectiveTableId = (table?._id || table?.tableNumber || tableNumber || tableId || activeTable || '').toString().trim();
+    const effectiveSlug = (restaurantSlug || restaurant?.slug || storedSession?.restaurantSlug || '').trim();
+    const effectiveTableId = (table?._id || tableId || storedSession?.tableId || '').toString().trim();
+    const effectiveTableNumber = (table?.tableNumber || tableNumber || storedSession?.tableNumber || activeTable || '').toString().trim();
+    const effectiveTableIdentifier = effectiveTableId || effectiveTableNumber;
 
     // Validate / Regenerate Guest Session ID
     let effectiveSessionId = getOrCreateSessionId();
@@ -343,9 +361,9 @@ const CustomerMenuContent = () => {
       return;
     }
 
-    // 3. if (!tableId) block payment
-    if (!effectiveTableId) {
-      toast.error('Table identification is missing. Please re-scan table QR code.');
+    // 3. if (!tableId / tableNumber) block payment
+    if (!effectiveTableIdentifier) {
+      toast.error('Invalid table information. Please scan QR code again.');
       return;
     }
 
@@ -379,8 +397,10 @@ const CustomerMenuContent = () => {
       if (paymentMethod === 'online') {
         const paymentPayload = {
           restaurantSlug: effectiveSlug,
-          tableId: effectiveTableId,
-          tableIdentifier: effectiveTableId,
+          restaurantId: restaurant?._id || storedSession?.restaurantId,
+          tableId: effectiveTableId || effectiveTableIdentifier,
+          tableNumber: effectiveTableNumber,
+          tableIdentifier: effectiveTableIdentifier,
           guestSessionId: effectiveSessionId,
           sessionId: effectiveSessionId,
           guestId,
@@ -490,8 +510,10 @@ const CustomerMenuContent = () => {
       // Places order immediately with status: placed, paymentStatus: pending, cashierStatus: unpaid
       const orderPayload = {
         restaurantSlug: effectiveSlug,
-        tableId: effectiveTableId,
-        tableIdentifier: effectiveTableId,
+        restaurantId: restaurant?._id || storedSession?.restaurantId,
+        tableId: effectiveTableId || effectiveTableIdentifier,
+        tableNumber: effectiveTableNumber,
+        tableIdentifier: effectiveTableIdentifier,
         guestId,
         deviceId,
         sessionId: effectiveSessionId,

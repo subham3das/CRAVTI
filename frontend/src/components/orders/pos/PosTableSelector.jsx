@@ -161,3 +161,4 @@ export const PosTableSelector = ({
 };
 
 export default PosTableSelector;
+

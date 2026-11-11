@@ -117,3 +117,4 @@ export const PosPaymentSelector = ({
 };
 
 export default PosPaymentSelector;
+

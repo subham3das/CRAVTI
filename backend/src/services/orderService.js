@@ -13,6 +13,7 @@ import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../conf
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { calculateSellingPrice } from '../utils/discountCalculator.js';
 import { getImageUrl } from '../utils/imageUtils.js';
+import { resolveRestaurantTable } from '../utils/tableUtils.js';
 
 /**
  * Helper to release table status to 'available' if no other active orders exist on that table
@@ -182,17 +183,10 @@ export const getCustomerMenuService = async (restaurantSlug, tableIdentifier = '
 
   let table = null;
   if (tableIdentifier) {
-    let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
-    const parsedNum = parseInt(tableIdentifier, 10);
-    if (!isNaN(parsedNum)) {
-      tableQuery.tableNumber = parsedNum;
-    } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
-      tableQuery._id = tableIdentifier;
+    table = await resolveRestaurantTable(restaurant._id, tableIdentifier);
+    if (!table && token) {
+      table = await resolveRestaurantTable(restaurant._id, token);
     }
-
-    table = await Table.findOne(tableQuery)
-      .select('tableNumber tableName floor capacity status isActive qrUrl qrToken qrId occupiedAt currentOrderId')
-      .lean();
 
     if (!table) {
       const error = new Error('Table not found');
@@ -372,16 +366,7 @@ export const getActiveCustomerOrderService = async ({ restaurantSlug, tableIdent
     .lean();
   if (!restaurant) return null;
 
-  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
-  const parsedNum = parseInt(tableIdentifier, 10);
-  if (!isNaN(parsedNum)) {
-    tableQuery.tableNumber = parsedNum;
-  } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
-    tableQuery._id = tableIdentifier;
-  } else {
-    return null;
-  }
-  const table = await Table.findOne(tableQuery).select('_id tableNumber').lean();
+  const table = await resolveRestaurantTable(restaurant._id, tableIdentifier);
   if (!table) return null;
 
   const query = {
@@ -464,28 +449,54 @@ export const placeOrderService = async (payload) => {
     throw error;
   }
 
-  // 3. Resolve Table
-  let tableQuery = { restaurantId: restaurant._id, isDeleted: { $ne: true } };
-  const parsedNum = parseInt(tableIdentifier, 10);
-  if (!isNaN(parsedNum)) {
-    tableQuery.tableNumber = parsedNum;
-  } else if (mongoose.Types.ObjectId.isValid(tableIdentifier)) {
-    tableQuery._id = tableIdentifier;
-  } else {
-    const error = new Error('Invalid table identifier specified');
+  // 3. Resolve Table with temporary diagnostic logging
+  const rawTable = payload.tableId || payload.tableIdentifier || payload.tableNumber || payload.table;
+
+  console.log('[Table Resolution Debug: Place Order Request]', {
+    restaurantId: restaurant._id,
+    tableId: payload.tableId,
+    tableNumber: payload.tableNumber,
+    tableIdentifier: payload.tableIdentifier,
+    incomingPayload: {
+      restaurantSlug: payload.restaurantSlug,
+      paymentMethod: payload.paymentMethod,
+      guestId,
+      itemsCount: items?.length,
+    },
+  });
+
+  if (!rawTable || String(rawTable).trim() === '' || String(rawTable).trim() === 'undefined' || String(rawTable).trim() === 'null') {
+    const error = new Error('Invalid table information. Please scan QR code again.');
     error.statusCode = 400;
     throw error;
   }
 
-  const table = await Table.findOne(tableQuery);
+  const table = (await resolveRestaurantTable(restaurant._id, rawTable)) ||
+    (payload.tableNumber ? await resolveRestaurantTable(restaurant._id, payload.tableNumber) : null) ||
+    (payload.tableIdentifier ? await resolveRestaurantTable(restaurant._id, payload.tableIdentifier) : null);
+
+  console.log('[Table Resolution Debug: Place Order Result]', {
+    restaurantId: restaurant._id,
+    rawTable,
+    databaseLookupResult: table
+      ? {
+          _id: table._id,
+          tableNumber: table.tableNumber,
+          tableName: table.tableName,
+          status: table.status,
+          isActive: table.isActive,
+        }
+      : null,
+  });
+
   if (!table) {
-    const error = new Error('Table not found');
+    const error = new Error('Invalid table information. Please scan QR code again.');
     error.statusCode = 404;
     throw error;
   }
 
   if (!table.isActive || table.status === 'disabled') {
-    const error = new Error('This table is currently disabled for ordering');
+    const error = new Error('This table is currently disabled for ordering.');
     error.statusCode = 403;
     throw error;
   }

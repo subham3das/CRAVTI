@@ -24,7 +24,7 @@ import {
 import { formatCurrency, safeNumber } from '../../utils/formatters';
 import { safeTrim, safeLower } from '../../utils/string';
 import { getImageUrl } from '../../utils/image';
-import toast from 'react-hot-toast';
+import toast from '../../utils/toast';
 
 // Modular Subcomponents
 import { PosMenuCard } from './pos/PosMenuCard';
@@ -415,25 +415,29 @@ export const ManualBillingModal = ({
         res = await createManualOrderApi(payload);
       }
 
-      if (res.success && res.order) {
-        setCreatedOrderId(res.order._id);
-        setCreatedOrderNumber(res.order.orderNumber);
+      const order = res?.order || res?.data?.order || res?.data;
+      if (res?.success && order) {
+        setCreatedOrderId(order._id);
+        setCreatedOrderNumber(order.orderNumber);
 
         if (action === 'save_draft') {
-          toast.success(`Draft saved (#${res.order.orderNumber})`);
-          onSuccess && onSuccess(res.order);
+          toast.success(`Draft saved (#${order.orderNumber})`);
+          onSuccess && onSuccess(order);
         } else if (action === 'generate') {
-          toast.success(`Bill generated (#${res.order.orderNumber})`);
-          onSuccess && onSuccess(res.order);
+          toast.success(`Bill generated (#${order.orderNumber})`);
+          onSuccess && onSuccess(order);
         } else if (action === 'mark_paid') {
-          toast.success(`Bill #${res.order.orderNumber} marked as PAID!`);
-          onSuccess && onSuccess(res.order);
+          toast.success(`Bill #${order.orderNumber} marked as PAID!`);
+          onSuccess && onSuccess(order);
           // Auto-prompt thermal receipt
-          handlePrintReceipt(res.order._id);
+          handlePrintReceipt(order._id);
           onClose();
+        } else {
+          toast.success(res.message || `Manual order updated successfully (#${order.orderNumber})`);
+          onSuccess && onSuccess(order);
         }
       } else {
-        toast.error(res.message || 'Operation failed');
+        toast.error(res?.message || 'Operation failed');
       }
     } catch (err) {
       console.error('Failed to submit manual order:', err);

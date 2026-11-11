@@ -134,3 +134,4 @@ export const PosMenuCard = React.memo(
 
 PosMenuCard.displayName = 'PosMenuCard';
 export default PosMenuCard;
+
