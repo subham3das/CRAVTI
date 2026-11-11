@@ -30,6 +30,7 @@ import {
 import { ImageWithFallback } from '../ImageWithFallback';
 import { CustomerVegBadge } from '../customer/CustomerVegBadge';
 import { formatCurrency, safeNumber } from '../../utils/formatters';
+import { safeString, safeTrim, safeLower } from '../../utils/string';
 import toast from 'react-hot-toast';
 
 export const ManualBillingModal = ({
@@ -196,16 +197,17 @@ export const ManualBillingModal = ({
 
     // Filter by Food Type (Veg / Non-Veg)
     if (foodTypeFilter !== 'all') {
-      items = items.filter((item) => item.foodType?.toLowerCase() === foodTypeFilter);
+      const ft = safeLower(foodTypeFilter);
+      items = items.filter((item) => safeLower(item.foodType) === ft);
     }
 
     // Filter by Search Query
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    const q = safeLower(searchQuery);
+    if (q) {
       items = items.filter(
         (item) =>
-          item.itemName?.toLowerCase().includes(q) ||
-          item.description?.toLowerCase().includes(q)
+          safeLower(item.itemName).includes(q) ||
+          safeLower(item.description).includes(q)
       );
     }
 
@@ -351,10 +353,10 @@ export const ManualBillingModal = ({
       action,
       billType,
       tableId: billType === 'table' ? selectedTableId : null,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
+      customerName: safeTrim(customerName),
+      customerPhone: safeTrim(customerPhone),
       sendToKitchen,
-      notes: billNotes.trim(),
+      notes: safeTrim(billNotes),
       items: cartItems.map((c) => ({
         itemId: c.itemId || c.menuItemId,
         menuItemId: c.menuItemId || c.itemId,
@@ -639,8 +641,8 @@ export const ManualBillingModal = ({
                           <div className="flex gap-3">
                             <div className="w-16 h-16 rounded-lg overflow-hidden relative bg-slate-100 shrink-0 border border-slate-100">
                               <ImageWithFallback
-                                src={item.image?.url || item.image}
-                                alt={item.itemName}
+                                src={typeof item.image === 'string' ? item.image : (item.image?.url || '')}
+                                alt={safeString(item.itemName)}
                                 type="menu"
                                 className="w-full h-full object-cover"
                               />
@@ -1095,3 +1097,4 @@ export const ManualBillingModal = ({
 };
 
 export default ManualBillingModal;
+

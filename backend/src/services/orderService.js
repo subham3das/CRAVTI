@@ -949,14 +949,16 @@ export const getLiveOrdersService = async (restaurantId, query = {}) => {
   }
 
   if (search) {
-    const s = search.trim();
-    filter.$or = [
-      { orderNumber: { $regex: s, $options: 'i' } },
-      { customerName: { $regex: s, $options: 'i' } },
-    ];
-    const num = parseInt(s, 10);
-    if (!isNaN(num)) {
-      filter.$or.push({ tableNumber: num });
+    const s = (search ?? '').toString().trim();
+    if (s) {
+      filter.$or = [
+        { orderNumber: { $regex: s, $options: 'i' } },
+        { customerName: { $regex: s, $options: 'i' } },
+      ];
+      const num = parseInt(s, 10);
+      if (!isNaN(num)) {
+        filter.$or.push({ tableNumber: num });
+      }
     }
   }
 
@@ -972,7 +974,18 @@ export const getLiveOrdersService = async (restaurantId, query = {}) => {
     .sort(sortCriteria)
     .lean();
 
-  return orders;
+  const sanitizedOrders = (orders || []).map((o) => ({
+    ...o,
+    customerName: o.customerName ?? '',
+    customerPhone: o.customerPhone ?? '',
+    tableName: o.tableName ?? (o.tableNumber ? `Table ${o.tableNumber}` : ''),
+    tableNumber: o.tableNumber ?? '',
+    status: (o.status ?? '').toString(),
+    paymentStatus: (o.paymentStatus ?? '').toString(),
+    billNumber: (o.billNumber ?? o.orderNumber ?? '').toString(),
+  }));
+
+  return sanitizedOrders;
 };
 
 /**
@@ -1003,14 +1016,16 @@ export const getHistoricalOrdersService = async (restaurantId, query = {}) => {
   }
 
   if (search) {
-    const s = search.trim();
-    filter.$or = [
-      { orderNumber: { $regex: s, $options: 'i' } },
-      { customerName: { $regex: s, $options: 'i' } },
-    ];
-    const num = parseInt(s, 10);
-    if (!isNaN(num)) {
-      filter.$or.push({ tableNumber: num });
+    const s = (search ?? '').toString().trim();
+    if (s) {
+      filter.$or = [
+        { orderNumber: { $regex: s, $options: 'i' } },
+        { customerName: { $regex: s, $options: 'i' } },
+      ];
+      const num = parseInt(s, 10);
+      if (!isNaN(num)) {
+        filter.$or.push({ tableNumber: num });
+      }
     }
   }
 
@@ -1031,8 +1046,19 @@ export const getHistoricalOrdersService = async (restaurantId, query = {}) => {
     Order.countDocuments(filter),
   ]);
 
+  const sanitizedOrders = (orders || []).map((o) => ({
+    ...o,
+    customerName: o.customerName ?? '',
+    customerPhone: o.customerPhone ?? '',
+    tableName: o.tableName ?? (o.tableNumber ? `Table ${o.tableNumber}` : ''),
+    tableNumber: o.tableNumber ?? '',
+    status: (o.status ?? '').toString(),
+    paymentStatus: (o.paymentStatus ?? '').toString(),
+    billNumber: (o.billNumber ?? o.orderNumber ?? '').toString(),
+  }));
+
   return {
-    orders,
+    orders: sanitizedOrders,
     pagination: {
       total,
       page: pageNum,

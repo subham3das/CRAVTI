@@ -270,3 +270,4 @@ export const ThermalReceiptModal = ({ isOpen, onClose, receiptData }) => {
 };
 
 export default ThermalReceiptModal;
+

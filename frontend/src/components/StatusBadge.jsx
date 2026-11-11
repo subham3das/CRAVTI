@@ -7,6 +7,9 @@ const statusMap = {
   served: { label: 'Served', variant: 'primary' },
   completed: { label: 'Completed', variant: 'success' },
   cancelled: { label: 'Cancelled', variant: 'danger' },
+  draft: { label: 'Draft', variant: 'neutral' },
+  generated: { label: 'Generated (Unpaid)', variant: 'blue' },
+  paid: { label: 'Paid', variant: 'success' },
 
   // Payments
   pending: { label: 'Pending', variant: 'warning' },
@@ -26,8 +29,8 @@ const statusMap = {
 };
 
 export const StatusBadge = ({ status, size = 'md' }) => {
-  const normalized = (status || '').toLowerCase();
-  const config = statusMap[normalized] || { label: status || 'Unknown', variant: 'neutral' };
+  const normalized = (status ?? '').toString().trim().toLowerCase();
+  const config = statusMap[normalized] || { label: (status ?? 'Unknown').toString().trim() || 'Unknown', variant: 'neutral' };
 
   return (
     <Badge variant={config.variant} size={size} dot>

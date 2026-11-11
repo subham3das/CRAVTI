@@ -26,6 +26,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { playOrderChime } from '../utils/soundNotification';
 import { formatCurrency, formatTime, formatDateTime } from '../utils/formatters';
+import { safeString, safeTrim, safeLower } from '../utils/string';
 import env from '../config/env.js';
 import {
   FiGrid,
@@ -429,15 +430,21 @@ export const Orders = () => {
       list = list.filter((o) => o.paymentStatus === paymentFilter);
     }
 
-    // Search Query (Order Number or Table Number)
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
-      list = list.filter(
-        (o) =>
-          o.orderNumber?.toLowerCase().includes(q) ||
-          String(o.tableNumber || '').includes(q) ||
-          o.customerName?.toLowerCase().includes(q)
-      );
+    // Search Query (Order Number, Table Number, Customer Name, or Phone)
+    const trimmedQuery = safeLower(searchQuery);
+    if (trimmedQuery) {
+      list = list.filter((o) => {
+        const orderNum = safeLower(o?.orderNumber);
+        const tblNum = safeLower(o?.tableNumber);
+        const custName = safeLower(o?.customerName);
+        const custPhone = safeLower(o?.customerPhone);
+        return (
+          orderNum.includes(trimmedQuery) ||
+          tblNum.includes(trimmedQuery) ||
+          custName.includes(trimmedQuery) ||
+          custPhone.includes(trimmedQuery)
+        );
+      });
     }
 
     // Sort
@@ -465,14 +472,14 @@ export const Orders = () => {
     {
       header: 'Order #',
       cell: (row) => (
-        <span className="font-mono font-bold text-xs text-slate-900">{row.orderNumber}</span>
+        <span className="font-mono font-bold text-xs text-slate-900">{safeString(row?.orderNumber)}</span>
       ),
     },
     {
       header: 'Table',
       cell: (row) => (
         <span className="inline-flex items-center px-2 py-0.5 rounded-lg bg-emerald-50 text-[#16A34A] font-extrabold text-xs border border-emerald-200">
-          T{row.tableNumber}
+          T{safeString(row?.tableNumber)}
         </span>
       ),
     },
@@ -480,8 +487,8 @@ export const Orders = () => {
       header: 'Customer',
       cell: (row) => (
         <div>
-          <p className="text-xs font-semibold text-slate-800">{row.customerName || 'Guest'}</p>
-          {row.customerPhone && <p className="text-[10px] text-slate-400">{row.customerPhone}</p>}
+          <p className="text-xs font-semibold text-slate-800">{safeString(row?.customerName) || 'Guest'}</p>
+          {row?.customerPhone && <p className="text-[10px] text-slate-400">{safeString(row.customerPhone)}</p>}
         </div>
       ),
     },
@@ -596,10 +603,10 @@ export const Orders = () => {
       cell: (row) => (
         <div>
           <span className="font-mono font-bold text-xs text-slate-900 block">
-            #{row.orderNumber}
+            #{safeString(row?.orderNumber)}
           </span>
           <span className="text-[10px] text-slate-400 font-medium">
-            {formatDateTime(row.createdAt)}
+            {formatDateTime(row?.createdAt)}
           </span>
         </div>
       ),
@@ -607,7 +614,8 @@ export const Orders = () => {
     {
       header: 'Type / Table',
       cell: (row) => {
-        const isTable = Boolean(row.tableId || row.tableNumber);
+        const isTable = Boolean(row?.tableId || row?.tableNumber);
+        const tblNum = safeString(row?.tableNumber || (typeof row?.tableId === 'object' ? row?.tableId?.tableNumber : ''));
         return (
           <span
             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs ${
@@ -619,7 +627,7 @@ export const Orders = () => {
             {isTable ? (
               <>
                 <MdOutlineTableRestaurant className="w-3.5 h-3.5" />
-                <span>Table {row.tableNumber}</span>
+                <span>Table {tblNum || '-'}</span>
               </>
             ) : (
               <>
@@ -636,10 +644,10 @@ export const Orders = () => {
       cell: (row) => (
         <div>
           <p className="text-xs font-bold text-slate-800">
-            {row.customerName || (row.tableNumber ? 'Table Guest' : 'Walk-in Guest')}
+            {safeString(row?.customerName) || (row?.tableNumber ? 'Table Guest' : 'Walk-in Guest')}
           </p>
-          {row.customerPhone && (
-            <p className="text-[10px] text-slate-400 font-mono">{row.customerPhone}</p>
+          {row?.customerPhone && (
+            <p className="text-[10px] text-slate-400 font-mono">{safeString(row?.customerPhone)}</p>
           )}
         </div>
       ),
@@ -649,10 +657,10 @@ export const Orders = () => {
       cell: (row) => (
         <div className="max-w-[200px]">
           <p className="text-xs text-slate-700 truncate font-medium">
-            {row.items?.map((i) => `${i.quantity}x ${i.itemName || i.name}`).join(', ')}
+            {row?.items?.map((i) => `${safeString(i?.quantity || 1)}x ${safeString(i?.itemName || i?.name || 'Dish')}`).join(', ')}
           </p>
           <span className="text-[10px] text-slate-400">
-            {row.items?.reduce((acc, c) => acc + (c.quantity || 1), 0)} items
+            {row?.items?.reduce((acc, c) => acc + (c?.quantity || 1), 0)} items
           </span>
         </div>
       ),
@@ -662,11 +670,11 @@ export const Orders = () => {
       cell: (row) => (
         <div>
           <span className="font-black text-xs text-slate-900 block">
-            {formatCurrency(row.grandTotal)}
+            {formatCurrency(row?.grandTotal)}
           </span>
-          {row.discount > 0 && (
+          {row?.discount > 0 && (
             <span className="text-[10px] text-emerald-600 font-semibold block">
-              -{formatCurrency(row.discount)} off
+              -{formatCurrency(row?.discount)} off
             </span>
           )}
         </div>
@@ -675,19 +683,20 @@ export const Orders = () => {
     {
       header: 'Status',
       cell: (row) => {
+        const st = safeLower(row?.status);
         let badgeColor = 'bg-slate-100 text-slate-700';
-        let label = row.status?.toUpperCase() || 'DRAFT';
+        let label = 'DRAFT';
 
-        if (row.status === 'draft') {
+        if (st === 'draft') {
           badgeColor = 'bg-amber-50 text-amber-700 border border-amber-200';
           label = 'Draft';
-        } else if (row.status === 'generated') {
+        } else if (st === 'generated') {
           badgeColor = 'bg-blue-50 text-blue-700 border border-blue-200';
           label = 'Unpaid Bill';
-        } else if (row.status === 'completed') {
+        } else if (st === 'completed') {
           badgeColor = 'bg-emerald-50 text-[#16A34A] border border-emerald-200';
           label = 'Paid';
-        } else if (row.status === 'cancelled') {
+        } else if (st === 'cancelled') {
           badgeColor = 'bg-rose-50 text-rose-700 border border-rose-200';
           label = 'Cancelled';
         }
@@ -703,7 +712,7 @@ export const Orders = () => {
       header: 'Payment Mode',
       cell: (row) => (
         <span className="text-xs font-bold text-slate-700 uppercase bg-slate-100 px-2 py-0.5 rounded">
-          {row.paymentMethod || 'none'}
+          {safeString(row?.paymentMethod) || 'none'}
         </span>
       ),
     },

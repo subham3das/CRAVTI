@@ -11,6 +11,24 @@ import { generateReceiptSnapshot } from './orderService.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 
+export const sanitizeManualOrder = (order) => {
+  if (!order) return order;
+  const o = typeof order.toObject === 'function' ? order.toObject() : { ...order };
+  return {
+    ...o,
+    customerName: o.customerName ?? '',
+    customerPhone: o.customerPhone ?? '',
+    tableName: o.tableName ?? (o.billType === 'walk_in' ? 'Walk-in' : (o.tableNumber ? `Table ${o.tableNumber}` : '')),
+    tableNumber: o.tableNumber ?? (o.billType === 'walk_in' ? 'Walk-in' : ''),
+    status: (o.status ?? 'draft').toString(),
+    paymentStatus: (o.paymentStatus ?? 'pending').toString(),
+    paymentMethod: (o.paymentMethod ?? 'none').toString(),
+    orderSource: (o.orderSource ?? 'MANUAL').toString(),
+    orderNumber: (o.orderNumber ?? '').toString(),
+    billNumber: (o.billNumber ?? o.orderNumber ?? '').toString(),
+  };
+};
+
 /**
  * Helper to compute tax and charges reusing restaurant settings
  */
@@ -287,7 +305,7 @@ export const createManualOrderService = async ({ restaurantId, user, payload = {
     console.warn('[Manual Billing] Socket emission note:', sErr.message);
   }
 
-  return { order, receipt };
+  return { order: sanitizeManualOrder(order), receipt };
 };
 
 /**
@@ -412,7 +430,7 @@ export const getManualOrdersService = async (restaurantId, query = {}) => {
   };
 
   return {
-    orders,
+    orders: (orders || []).map(sanitizeManualOrder),
     pagination: {
       page: pageNum,
       limit: limitNum,
@@ -442,7 +460,7 @@ export const getManualOrderByIdService = async (restaurantId, orderId) => {
 
   const receipt = await Receipt.findOne({ orderId: order._id }).lean();
 
-  return { order, receipt };
+  return { order: sanitizeManualOrder(order), receipt };
 };
 
 /**
@@ -565,7 +583,7 @@ export const updateManualOrderService = async ({ restaurantId, user, orderId, pa
     console.warn('Socket note:', e.message);
   }
 
-  return order;
+  return sanitizeManualOrder(order);
 };
 
 /**
@@ -666,7 +684,7 @@ export const markManualOrderPaidService = async ({
     console.warn('Socket note:', e.message);
   }
 
-  return { order, receipt };
+  return { order: sanitizeManualOrder(order), receipt };
 };
 
 /**
@@ -774,3 +792,4 @@ export const printManualOrderReceiptService = async ({ restaurantId, orderId }) 
 
   return receipt;
 };
+

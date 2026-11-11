@@ -17,7 +17,13 @@ export const ImageWithFallback = ({
 }) => {
   const [hasError, setHasError] = useState(false);
 
-  const isInvalidSrc = !src || src.trim() === '' || src.includes('undefined') || src.includes('null');
+  const resolvedSrc = typeof src === 'string'
+    ? src.trim()
+    : (src && typeof src === 'object' && typeof src.url === 'string')
+    ? src.url.trim()
+    : '';
+
+  const isInvalidSrc = !resolvedSrc || resolvedSrc === '' || resolvedSrc.includes('undefined') || resolvedSrc.includes('null');
 
   if (hasError || isInvalidSrc) {
     if (fallbackContent) {
@@ -82,7 +88,7 @@ export const ImageWithFallback = ({
 
   return (
     <img
-      src={src}
+      src={resolvedSrc}
       alt={alt}
       className={className}
       onError={() => setHasError(true)}

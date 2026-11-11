@@ -1,5 +1,5 @@
 export const CustomerVegBadge = ({ type = 'veg', className = '' }) => {
-  const normalized = (type || 'veg').toLowerCase();
+  const normalized = (type ?? 'veg').toString().trim().toLowerCase();
 
   if (normalized === 'veg') {
     return (

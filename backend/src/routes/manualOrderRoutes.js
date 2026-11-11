@@ -28,3 +28,4 @@ router.delete('/:id', cancelManualOrder);
 router.post('/:id/print', printManualOrderReceipt);
 
 export default router;
+

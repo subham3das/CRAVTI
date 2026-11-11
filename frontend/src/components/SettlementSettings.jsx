@@ -206,11 +206,11 @@ export const SettlementSettings = () => {
     if (!bankData.isEditable) return;
 
     // Frontend validations
-    if (!bankData.accountHolderName.trim()) {
+    if (!(bankData.accountHolderName ?? '').toString().trim()) {
       toast.error('Account holder name is required');
       return;
     }
-    if (!bankData.bankName.trim()) {
+    if (!(bankData.bankName ?? '').toString().trim()) {
       toast.error('Bank name is required');
       return;
     }

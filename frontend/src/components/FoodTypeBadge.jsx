@@ -1,5 +1,5 @@
 export const FoodTypeBadge = ({ type = 'veg', showLabel = false, size = 'md' }) => {
-  const normalized = (type || 'veg').toLowerCase();
+  const normalized = (type ?? 'veg').toString().trim().toLowerCase();
 
   const sizeClasses = {
     sm: 'w-3.5 h-3.5 p-0.5',

@@ -227,8 +227,8 @@ const CustomerMenuContent = () => {
   const filteredItems = useMemo(() => {
     let list = Array.isArray(menuItems) ? menuItems : [];
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
+    if ((searchQuery ?? '').toString().trim()) {
+      const q = (searchQuery ?? '').toString().trim().toLowerCase();
       list = list.filter(
         (i) =>
           i.itemName?.toLowerCase().includes(q) ||
@@ -255,7 +255,7 @@ const CustomerMenuContent = () => {
 
   // Items grouped by category
   const groupedItems = useMemo(() => {
-    if (activeCategory !== 'ALL' || searchQuery.trim()) {
+    if (activeCategory !== 'ALL' || (searchQuery ?? '').toString().trim()) {
       return null;
     }
 
@@ -787,7 +787,7 @@ const CustomerMenuContent = () => {
         ) : (
           <>
             {/* Popular / Recommended Items */}
-            {activeCategory === 'ALL' && !searchQuery.trim() && popularItems.length > 0 && (
+            {activeCategory === 'ALL' && !(searchQuery ?? '').toString().trim() && popularItems.length > 0 && (
               <section className="space-y-3">
                 <div className="flex items-center gap-1.5">
                   <FiStar className="w-4 h-4 text-amber-500 fill-amber-500" />
