@@ -59,3 +59,28 @@ export const fetchOrderMetricsApi = () =>
 
 export const softDeleteOrderApi = (orderId) =>
   api.delete(`/orders/${orderId}`).then(r => r.data);
+
+/**
+ * Manual Billing (POS) APIs
+ */
+export const createManualOrderApi = (payload) =>
+  api.post('/manual-orders', payload).then((r) => r.data);
+
+export const fetchManualOrdersApi = (params = {}) =>
+  api.get('/manual-orders', { params }).then((r) => r.data);
+
+export const fetchManualOrderByIdApi = (id) =>
+  api.get(`/manual-orders/${id}`).then((r) => r.data);
+
+export const updateManualOrderApi = (id, payload) =>
+  api.patch(`/manual-orders/${id}`, payload).then((r) => r.data);
+
+export const markManualOrderPaidApi = (id, payload) =>
+  api.patch(`/manual-orders/${id}/pay`, payload).then((r) => r.data);
+
+export const cancelManualOrderApi = (id, reason = '') =>
+  api.delete(`/manual-orders/${id}`, { data: { reason } }).then((r) => r.data);
+
+export const printManualOrderReceiptApi = (id) =>
+  api.post(`/manual-orders/${id}/print`).then((r) => r.data);
+

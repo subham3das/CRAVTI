@@ -53,10 +53,31 @@ const paymentSchema = new mongoose.Schema(
       default: '',
       index: true,
     },
+    paymentSource: {
+      type: String,
+      enum: ['QR', 'MANUAL', 'qr', 'manual'],
+      default: 'QR',
+      index: true,
+    },
+    cashierId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'RestaurantUser',
+      default: null,
+    },
+    splitPayments: [
+      {
+        method: {
+          type: String,
+          enum: ['cash', 'upi', 'card'],
+        },
+        amount: Number,
+        reference: String,
+      },
+    ],
     razorpayOrderId: {
       type: String,
-      required: true,
-      unique: true,
+      required: false,
+      sparse: true,
       index: true,
     },
     razorpayPaymentId: {

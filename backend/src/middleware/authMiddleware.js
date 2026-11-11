@@ -40,3 +40,17 @@ export const protect = async (req, res, next) => {
   }
 };
 
+export const authorizeRoles = (...roles) => {
+  return (req, res, next) => {
+    // Owner, manager, cashier are permitted. Staff / kitchen are blocked.
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: `Role '${req.user?.role || 'user'}' is not authorized to access this resource. Allowed roles: ${roles.join(', ')}.`,
+      });
+    }
+    next();
+  };
+};
+
+

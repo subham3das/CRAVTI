@@ -6,6 +6,7 @@ import categoryRoutes from './categoryRoutes.js';
 import menuRoutes from './menuRoutes.js';
 import tableRoutes from './tableRoutes.js';
 import orderRoutes from './orderRoutes.js';
+import manualOrderRoutes from './manualOrderRoutes.js';
 import settingsRoutes from './settingsRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
@@ -42,6 +43,7 @@ router.use('/menu', menuRoutes);
 router.use('/tables', tableRoutes);
 router.use('/orders', orderRoutes);
 router.use('/order', orderRoutes); // Alias for customer ordering path
+router.use('/manual-orders', manualOrderRoutes);
 router.use('/customer', customerRoutes); // Customer public menu & categories APIs
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);

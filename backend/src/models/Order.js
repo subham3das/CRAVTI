@@ -82,19 +82,33 @@ const orderSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    orderSource: {
+      type: String,
+      enum: ['QR', 'MANUAL', 'qr', 'manual'],
+      default: 'QR',
+      index: true,
+    },
+    billType: {
+      type: String,
+      enum: ['table', 'walk_in', 'dine_in', 'takeaway'],
+      default: 'table',
+    },
     tableId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Table',
-      required: true,
+      required: false,
+      default: null,
       index: true,
     },
     tableNumber: {
-      type: Number,
-      required: true,
+      type: mongoose.Schema.Types.Mixed,
+      required: false,
+      default: '',
     },
     guestId: {
       type: String,
-      required: true,
+      required: false,
+      default: () => 'guest_' + Date.now().toString(36),
       index: true,
     },
     deviceId: {
@@ -115,7 +129,7 @@ const orderSchema = new mongoose.Schema(
     items: {
       type: [orderItemSchema],
       required: true,
-      validate: [val => val.length > 0, 'Order must contain at least one item'],
+      validate: [val => Array.isArray(val), 'Order items must be an array'],
     },
     subtotal: {
       type: Number,
@@ -125,11 +139,34 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    billDiscount: {
+      type: {
+        type: String,
+        enum: ['none', 'flat', 'percentage'],
+        default: 'none',
+      },
+      value: {
+        type: Number,
+        default: 0,
+      },
+      amount: {
+        type: Number,
+        default: 0,
+      },
+    },
     tax: {
       type: Number,
       default: 0,
     },
     serviceCharge: {
+      type: Number,
+      default: 0,
+    },
+    packagingCharge: {
+      type: Number,
+      default: 0,
+    },
+    deliveryCharge: {
       type: Number,
       default: 0,
     },
@@ -139,7 +176,7 @@ const orderSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['placed', 'accepted', 'served', 'completed', 'cancelled', 'PAID', 'paid'],
+      enum: ['draft', 'generated', 'placed', 'accepted', 'served', 'completed', 'cancelled', 'PAID', 'paid'],
       default: 'placed',
       index: true,
     },
@@ -165,8 +202,42 @@ const orderSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['none', 'online', 'cash', 'upi', 'card'],
+      enum: ['none', 'online', 'cash', 'upi', 'card', 'split', 'SPLIT'],
       default: 'none',
+    },
+    splitPayments: [
+      {
+        method: {
+          type: String,
+          enum: ['cash', 'upi', 'card'],
+        },
+        amount: {
+          type: Number,
+          default: 0,
+        },
+        reference: {
+          type: String,
+          default: '',
+        },
+      },
+    ],
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'RestaurantUser',
+      default: null,
+    },
+    staffName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    sendToKitchen: {
+      type: Boolean,
+      default: false,
+    },
+    notes: {
+      type: mongoose.Schema.Types.Mixed,
+      default: '',
     },
     customerName: {
       type: String,
@@ -211,6 +282,7 @@ const orderSchema = new mongoose.Schema(
 // Indexes for high-performance live dashboard querying
 orderSchema.index({ restaurantId: 1, isDeleted: 1, status: 1 });
 orderSchema.index({ restaurantId: 1, isDeleted: 1, createdAt: -1 });
+orderSchema.index({ restaurantId: 1, orderSource: 1, createdAt: -1 });
 orderSchema.index({ restaurantId: 1, tableId: 1, status: 1 });
 orderSchema.index({ restaurantId: 1, guestId: 1 });
 orderSchema.index({ restaurantId: 1, paymentStatus: 1 });

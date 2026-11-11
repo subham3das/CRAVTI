@@ -232,6 +232,7 @@ export const getRestaurantPaymentsListService = async (restaurantId, query = {})
   const {
     filter = 'all', // 'today', 'week', 'month', 'all'
     status = 'all', // 'all', 'success', 'pending', 'refunded', 'failed'
+    source = 'all', // 'all', 'QR', 'MANUAL'
     search = '',
     page = 1,
     limit = 15,
@@ -246,6 +247,19 @@ export const getRestaurantPaymentsListService = async (restaurantId, query = {})
     restaurantId: restId,
     isDeleted: false,
   };
+
+  // Source Filter (QR Orders vs Manual POS Bills)
+  if (source && source !== 'all') {
+    if (source.toUpperCase() === 'MANUAL') {
+      filterMatch.orderSource = { $in: ['MANUAL', 'manual'] };
+    } else if (source.toUpperCase() === 'QR') {
+      filterMatch.$or = [
+        { orderSource: { $in: ['QR', 'qr'] } },
+        { orderSource: { $exists: false } },
+        { orderSource: null },
+      ];
+    }
+  }
 
   // Date Filters
   if (filter === 'today') {
@@ -280,7 +294,7 @@ export const getRestaurantPaymentsListService = async (restaurantId, query = {})
 
   const [orders, total] = await Promise.all([
     Order.find(filterMatch)
-      .select('orderNumber tableNumber customerName customerPhone grandTotal paymentStatus paymentMethod createdAt')
+      .select('orderNumber tableNumber customerName customerPhone grandTotal paymentStatus paymentMethod createdAt orderSource billType')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
@@ -308,18 +322,22 @@ export const getRestaurantPaymentsListService = async (restaurantId, query = {})
     }
 
     const payId = `PAY_${o.orderNumber?.replace(/[^a-zA-Z0-9]/g, '') || o._id.toString().slice(-8).toUpperCase()}`;
+    const isManual = o.orderSource?.toUpperCase() === 'MANUAL';
 
     return {
       paymentId: payId,
       rawId: o._id,
       orderId: `#${o.orderNumber || o._id.toString().slice(-6)}`,
-      customer: o.customerName || 'Walk-in Guest',
+      customer: o.customerName || (isManual ? 'Walk-in Guest' : 'Guest'),
       customerPhone: o.customerPhone || '',
-      table: `T${o.tableNumber}`,
+      table: o.tableNumber ? `T${o.tableNumber}` : 'Walk-in',
       amount: Math.round(o.grandTotal || 0),
       paymentMode: methodLabel,
       gateway: isCash ? 'Direct Counter' : 'Razorpay',
       status: isSuccess ? 'Success' : o.paymentStatus === 'refunded' ? 'Refunded' : 'Pending',
+      source: isManual ? 'MANUAL' : 'QR',
+      orderSource: isManual ? 'MANUAL' : 'QR',
+      billType: o.billType || (o.tableNumber ? 'table' : 'walk_in'),
       time: o.createdAt,
       settlementStatus,
     };

@@ -54,6 +54,7 @@ export const Payments = () => {
   // Tab & Filters State
   const [dateFilter, setDateFilter] = useState('all'); // 'today', 'week', 'month', 'all'
   const [statusFilter, setStatusFilter] = useState('all'); // 'all', 'success', 'pending', 'refunded'
+  const [sourceFilter, setSourceFilter] = useState('all'); // 'all', 'QR', 'MANUAL'
   const [chartTimeframe, setChartTimeframe] = useState('7days'); // '7days', '30days', '6months'
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,6 +95,7 @@ export const Payments = () => {
         fetchRestaurantPaymentsApi({
           filter: dateFilter,
           status: statusFilter,
+          source: sourceFilter === 'all' ? undefined : sourceFilter,
           search: searchQuery,
           page: currentPage,
           limit: 15,
@@ -121,7 +123,7 @@ export const Payments = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [dateFilter, statusFilter, chartTimeframe, searchQuery, currentPage]);
+  }, [dateFilter, statusFilter, sourceFilter, chartTimeframe, searchQuery, currentPage]);
 
   useEffect(() => {
     loadDashboardData();
@@ -515,6 +517,20 @@ export const Payments = () => {
               ))}
             </div>
 
+            {/* Source Filter */}
+            <select
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="text-xs py-1.5 px-2.5 rounded-xl border border-slate-200 bg-white font-bold text-slate-700"
+            >
+              <option value="all">All Sources</option>
+              <option value="QR">QR Orders</option>
+              <option value="MANUAL">Manual Bills</option>
+            </select>
+
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -543,6 +559,7 @@ export const Payments = () => {
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-100 text-slate-400 uppercase text-[10px] tracking-wider">
+                  <th className="pb-2.5 font-bold">Source</th>
                   <th className="pb-2.5 font-bold">Payment ID</th>
                   <th className="pb-2.5 font-bold">Order ID</th>
                   <th className="pb-2.5 font-bold">Customer</th>
@@ -558,6 +575,17 @@ export const Payments = () => {
               <tbody className="divide-y divide-slate-50">
                 {paymentsData.payments.map((p) => (
                   <tr key={p.paymentId} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-2.5">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                          p.source === 'MANUAL'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-emerald-50 text-[#16A34A] border border-emerald-200'
+                        }`}
+                      >
+                        {p.source === 'MANUAL' ? 'Manual POS' : 'QR Order'}
+                      </span>
+                    </td>
                     <td className="py-2.5 font-bold text-slate-900 font-mono text-[11px]">{p.paymentId}</td>
                     <td className="py-2.5 font-extrabold text-slate-800">{p.orderId}</td>
                     <td className="py-2.5 font-medium text-slate-600">{p.customer}</td>
