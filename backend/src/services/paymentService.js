@@ -522,6 +522,15 @@ export const createPrepaidOrderFromPayload = async (payment, razorpayPaymentId, 
         paymentId: razorpayPaymentId,
       },
     });
+
+    createRestaurantNotification({
+      restaurantId: order.restaurantId,
+      type: 'ORDER',
+      title: `Paid Order #${order.orderNumber}`,
+      message: `Table ${order.tableNumber || 'N/A'} - Online Payment Received (₹${order.grandTotal})`,
+      link: '/orders',
+      metadata: { orderId: order._id, orderNumber: order.orderNumber, tableNumber: order.tableNumber },
+    }).catch((e) => console.warn('[Payment] In-app notification creation note:', e.message));
   } catch (sErr) {
     console.warn('[Prepay] Socket emission note:', sErr.message);
   }

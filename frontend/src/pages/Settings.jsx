@@ -6,7 +6,7 @@ import { Button } from '../components/Button';
 import { Loader } from '../components/Loader';
 import { useSettings } from '../context/SettingsContext';
 import { SettlementSettings } from '../components/SettlementSettings';
-import { playOrderChime, setStoredNotificationVolume } from '../utils/soundNotification';
+import { playNewOrderSound, playOrderChime, setStoredNotificationVolume } from '../utils/soundNotification';
 import { formatCurrency } from '../utils/formatters';
 import { fetchGatewayStatusApi, testGatewayConnectionApi } from '../services/paymentService';
 import {

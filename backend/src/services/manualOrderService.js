@@ -10,6 +10,7 @@ import { getNextOrderNumber } from '../models/Counter.js';
 import { generateReceiptSnapshot } from './orderService.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
+import { createRestaurantNotification } from './notificationService.js';
 import { getImageUrl } from '../utils/imageUtils.js';
 import { recordOrderSettlement } from './settlementService.js';
 
@@ -309,9 +310,17 @@ export const createManualOrderService = async ({ restaurantId, user, payload = {
   // Real-time socket emission
   try {
     emitToRestaurant(restId, 'manual-order-created', { order, receipt });
-    if (sendToKitchen) {
-      emitToRestaurant(restId, SOCKET_EVENTS.ORDER_CREATED, order);
-    }
+    emitToRestaurant(restId, 'new-order', order);
+    emitToRestaurant(restId, SOCKET_EVENTS.ORDER_CREATED, order);
+
+    createRestaurantNotification({
+      restaurantId: restId,
+      type: 'ORDER',
+      title: `Manual Order #${order.orderNumber}`,
+      message: `POS Billing - ${order.items?.length || 0} item(s) (₹${order.grandTotal})`,
+      link: '/orders',
+      metadata: { orderId: order._id, orderNumber: order.orderNumber },
+    }).catch((e) => console.warn('[Manual Billing] In-app notification creation note:', e.message));
   } catch (sErr) {
     console.warn('[Manual Billing] Socket emission note:', sErr.message);
   }

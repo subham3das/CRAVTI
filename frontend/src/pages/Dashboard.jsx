@@ -107,7 +107,10 @@ export const Dashboard = () => {
     socket.on('payment-updated', onOrderOrSyncUpdate);
     socket.on('restaurant.updated', onOrderOrSyncUpdate);
 
+    window.addEventListener('craviti:new-order-received', onOrderOrSyncUpdate);
+
     return () => {
+      window.removeEventListener('craviti:new-order-received', onOrderOrSyncUpdate);
       socket.disconnect();
     };
   }, [restaurant?._id, dashboardData?.restaurant?._id, loadDashboard]);

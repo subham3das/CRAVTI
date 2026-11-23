@@ -140,6 +140,6 @@ export const printManualOrderReceipt = asyncHandler(async (req, res) => {
     orderId: req.params.id,
   });
 
-  return sendSuccess(res, 'Receipt prepared for printing', result, HTTP_STATUS.OK);
+  return sendSuccess(res, 'Receipt prepared for printing', { receipt: result }, HTTP_STATUS.OK, { receipt: result });
 });
 

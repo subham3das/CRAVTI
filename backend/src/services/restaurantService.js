@@ -26,6 +26,9 @@ export const createOnboardingRestaurant = async (userId, data, logoFile) => {
   const suffix = Math.random().toString(36).substring(2, 7);
   const slug = `${baseSlug}-${suffix}`;
 
+  const now = new Date();
+  const trialEndDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+
   const restaurant = new Restaurant({
     restaurantName: data.restaurantName,
     slug,
@@ -37,6 +40,15 @@ export const createOnboardingRestaurant = async (userId, data, logoFile) => {
       city: data.city || '',
       state: data.state || '',
       pincode: data.pincode || '',
+    },
+    registrationDate: now,
+    subscription: {
+      planName: 'Craviti Pro',
+      status: 'trial',
+      registrationDate: now,
+      trialStartDate: now,
+      trialEndDate: trialEndDate,
+      trialEndsAt: trialEndDate,
     },
     profileCompleted: true,
     paymentEnabled: false,

@@ -24,7 +24,8 @@ import {
   printManualOrderReceiptApi,
 } from '../services/orderService';
 import { useAuth } from '../context/AuthContext';
-import { playOrderChime } from '../utils/soundNotification';
+import { useSettings } from '../context/SettingsContext';
+import { playNewOrderSound, playOrderChime } from '../utils/soundNotification';
 import { formatCurrency, formatTime, formatDateTime } from '../utils/formatters';
 import { safeString, safeTrim, safeLower } from '../utils/string';
 import env from '../config/env.js';
@@ -94,7 +95,8 @@ export const Orders = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
   const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'oldest'
-  const [soundEnabled, setSoundEnabled] = useState(true);
+  const { settings, updateSettings } = useSettings();
+  const soundEnabled = settings?.notificationSound !== false;
   const [newOrderIds, setNewOrderIds] = useState(new Set());
 
   // Modal State for QR Orders
@@ -225,18 +227,9 @@ export const Orders = () => {
       socket.emit('join-restaurant', restaurant._id);
     });
 
-    // New Incoming Order
+    // New Incoming Order handler
     const handleNewOrder = (order) => {
       if (!order) return;
-
-      if (soundEnabled) {
-        playOrderChime();
-      }
-
-      toast.success(
-        `🔔 Order #${order.orderNumber} (Table ${order.tableNumber}) received!`,
-        { duration: 5000 }
-      );
 
       // Highlight new card for 8 seconds
       setNewOrderIds((prev) => new Set([...prev, order._id]));
@@ -258,8 +251,16 @@ export const Orders = () => {
       });
     };
 
+    const handleCustomEvent = (e) => {
+      if (e?.detail) {
+        handleNewOrder(e.detail);
+      }
+    };
+    window.addEventListener('craviti:new-order-received', handleCustomEvent);
+
     socket.on('new-order', handleNewOrder);
     socket.on('new_order', handleNewOrder);
+    socket.on('order.created', handleNewOrder);
 
     // Order Updated
     const handleOrderUpdate = (updatedOrder) => {
@@ -298,6 +299,7 @@ export const Orders = () => {
     socket.on('manual-order-updated', handleManualOrderUpdate);
 
     return () => {
+      window.removeEventListener('craviti:new-order-received', handleCustomEvent);
       socket.disconnect();
     };
   }, [restaurant?._id, soundEnabled, activeMainTab, loadManualOrders]);
@@ -395,8 +397,9 @@ export const Orders = () => {
   const handlePrintManualReceipt = async (orderId) => {
     try {
       const res = await printManualOrderReceiptApi(orderId);
-      if (res.success && res.receipt) {
-        setReceiptData(res.receipt);
+      const receipt = res.receipt || res.data?.receipt;
+      if (res.success && receipt) {
+        setReceiptData(receipt);
         setIsThermalReceiptOpen(true);
       } else {
         toast.error(res.message || 'Receipt not ready');
@@ -796,8 +799,10 @@ export const Orders = () => {
             {isLiveTab && (
               <button
                 type="button"
-                onClick={() => setSoundEnabled((v) => !v)}
-                className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                onClick={() => {
+                  updateSettings && updateSettings({ notificationSound: !soundEnabled });
+                }}
+                className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                   soundEnabled
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     : 'bg-slate-100 text-slate-400 border-slate-200'

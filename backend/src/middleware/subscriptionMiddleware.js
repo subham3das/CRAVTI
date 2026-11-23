@@ -1,5 +1,5 @@
 import { Restaurant } from '../models/Restaurant.js';
-import { calculateSubscriptionState } from '../utils/subscriptionUtils.js';
+import { getSubscriptionState } from '../utils/subscriptionUtils.js';
 import { HTTP_STATUS } from '../constants/index.js';
 
 /**
@@ -16,12 +16,12 @@ export const verifySubscription = async (req, res, next) => {
       return next();
     }
 
-    const restaurant = await Restaurant.findById(restaurantId).select('subscription restaurantName isDeleted createdAt');
+    const restaurant = await Restaurant.findById(restaurantId).select('subscription restaurantName isDeleted createdAt registrationDate');
     if (!restaurant || restaurant.isDeleted) {
       return next();
     }
 
-    const subState = calculateSubscriptionState(restaurant.subscription, restaurant.createdAt);
+    const subState = getSubscriptionState(restaurant);
 
     if (subState.canAccessFeatures) {
       return next();

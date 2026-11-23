@@ -11,6 +11,7 @@ const restaurantNotificationSchema = new mongoose.Schema(
     type: {
       type: String,
       enum: [
+        'ORDER',
         'APPROVAL',
         'REJECTION',
         'PAYMENT',

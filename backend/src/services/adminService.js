@@ -514,19 +514,17 @@ export const updateRestaurantVerificationWorkflowService = async (
 
   // Phase 4.2: Dispatch Restaurant In-App Notification and Real-time Socket Event
   if (status === VERIFICATION_STATUS.VERIFIED) {
-    // Each newly approved restaurant automatically receives 14-day free trial
-    const now = new Date();
-    const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
     restaurant.subscription = restaurant.subscription || {};
-    if (!restaurant.subscription.status || restaurant.subscription.status === 'trial') {
+    const regDate = restaurant.registrationDate || restaurant.createdAt || new Date();
+    if (!restaurant.subscription.trialStartDate) {
+      const trialEnd = new Date(new Date(regDate).getTime() + 14 * 24 * 60 * 60 * 1000);
       restaurant.subscription.status = 'trial';
       restaurant.subscription.planName = 'Craviti Pro';
       restaurant.subscription.planId = env.RAZORPAY_BASIC_PLAN_ID || '';
-      restaurant.subscription.trialStartDate = now;
+      restaurant.subscription.registrationDate = regDate;
+      restaurant.subscription.trialStartDate = regDate;
       restaurant.subscription.trialEndDate = trialEnd;
       restaurant.subscription.trialEndsAt = trialEnd;
-      restaurant.subscription.subscriptionStart = now;
-      restaurant.subscription.subscriptionEnd = trialEnd;
     }
     await restaurant.save();
 

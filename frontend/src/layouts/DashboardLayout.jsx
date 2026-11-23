@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { FiClock, FiArrowRight } from 'react-icons/fi';
 import { Sidebar } from '../components/Sidebar';
 import { Navbar } from '../components/Navbar';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { OrderNotificationWatcher } from '../components/OrderNotificationWatcher';
 import { useAuth } from '../context/AuthContext';
+import { initAudioUnlock } from '../utils/soundNotification';
 import toast from 'react-hot-toast';
 
 export const DashboardLayout = () => {
@@ -12,6 +14,10 @@ export const DashboardLayout = () => {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const { logout, restaurant } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    initAudioUnlock();
+  }, []);
 
   const handleConfirmLogout = () => {
     logout();
@@ -36,6 +42,7 @@ export const DashboardLayout = () => {
 
       {/* Main Wrapper with desktop sidebar offset */}
       <div className="lg:pl-64 flex flex-col flex-1 min-w-0">
+        <OrderNotificationWatcher />
         <Navbar onOpenSidebar={() => setSidebarOpen(true)} />
 
         {/* Top Free Trial Banner */}

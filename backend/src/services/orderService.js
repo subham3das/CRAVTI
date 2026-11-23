@@ -11,6 +11,7 @@ import { Receipt } from '../models/Receipt.js';
 import { getNextOrderNumber, getNextReceiptNumber } from '../models/Counter.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
+import { createRestaurantNotification } from './notificationService.js';
 import { calculateSellingPrice } from '../utils/discountCalculator.js';
 import { getImageUrl } from '../utils/imageUtils.js';
 import { resolveRestaurantTable } from '../utils/tableUtils.js';
@@ -65,6 +66,25 @@ export const generateReceiptSnapshot = async (orderId) => {
     const receiptPrefix = settings?.receiptPrefix || 'CRV';
     const receiptNumber = await getNextReceiptNumber(receiptPrefix);
 
+    const isWalkIn =
+      order.billType === 'walk_in' ||
+      !order.tableId ||
+      String(order.tableNumber || '').toLowerCase().includes('walk');
+
+    const resolvedTableNumber = isWalkIn
+      ? (typeof order.tableNumber === 'number' ? order.tableNumber : 0)
+      : (table?.tableNumber || (typeof order.tableNumber === 'number' ? order.tableNumber : Number(order.tableNumber) || 1));
+
+    const resolvedTableName =
+      table?.tableName ||
+      (isWalkIn ? 'Walk-in Customer' : (order.tableNumber ? `Table ${order.tableNumber}` : 'Table 1'));
+
+    const resolvedFloor =
+      table?.floor || (isWalkIn ? 'Counter' : 'Main Floor');
+
+    const resolvedCustomerName =
+      order.customerName?.trim() || (isWalkIn ? 'Walk-in Customer' : 'Guest');
+
     const receipt = await Receipt.create({
       receiptNumber,
       orderNumber: order.orderNumber,
@@ -81,31 +101,31 @@ export const generateReceiptSnapshot = async (orderId) => {
         website: restaurant?.website || '',
       },
       tableSnapshot: {
-        tableNumber: table?.tableNumber || order.tableNumber,
-        tableName: table?.tableName || '',
-        floor: table?.floor || 'Main Floor',
+        tableNumber: resolvedTableNumber,
+        tableName: resolvedTableName,
+        floor: resolvedFloor,
       },
       guestSnapshot: {
-        customerName: order.customerName || 'Guest',
+        customerName: resolvedCustomerName,
         customerPhone: order.customerPhone || '',
         customerId: order.customerId || order.guestId || '',
         guestId: order.guestId || '',
         deviceId: order.deviceId || '',
       },
       itemsSnapshot: (order.items || []).map((i) => ({
-        itemId: i.itemId || i.menuItemId,
-        itemName: i.itemName || i.name,
-        originalPrice: i.originalPrice || i.price,
-        sellingPrice: i.sellingPrice || i.price,
-        quantity: i.quantity,
+        itemId: i.itemId || i.menuItemId || null,
+        itemName: i.itemName || i.name || 'Item',
+        originalPrice: Number(i.originalPrice || i.price || 0),
+        sellingPrice: Number(i.sellingPrice || i.price || 0),
+        quantity: Number(i.quantity || 1),
         foodType: i.foodType || 'veg',
         specialInstructions: i.specialInstructions || '',
       })),
-      subtotal: order.subtotal,
-      discount: order.discount || 0,
-      gst: order.tax || 0,
-      serviceCharge: order.serviceCharge || 0,
-      grandTotal: order.grandTotal,
+      subtotal: Number(order.subtotal || 0),
+      discount: Number(order.discount || 0),
+      gst: Number(order.tax || 0),
+      serviceCharge: Number(order.serviceCharge || 0),
+      grandTotal: Number(order.grandTotal || 0),
       paymentMethod: order.paymentMethod || 'cash',
       paymentStatus: order.paymentStatus || 'paid_cash',
       paidAt: order.paidAt || new Date(),
@@ -605,6 +625,15 @@ export const placeOrderService = async (payload) => {
       emitToOrder(existingActiveTableOrder._id, 'order-updated', existingActiveTableOrder);
       emitToTable(table._id, 'order-updated', existingActiveTableOrder);
       emitToAdmin(SOCKET_EVENTS.ORDER_UPDATED, existingActiveTableOrder);
+
+      createRestaurantNotification({
+        restaurantId: restaurant._id,
+        type: 'ORDER',
+        title: `Order Updated #${existingActiveTableOrder.orderNumber}`,
+        message: `Table ${table.tableNumber || 'N/A'} - Added ${validatedNewItems.length} item(s) (₹${existingActiveTableOrder.grandTotal})`,
+        link: '/orders',
+        metadata: { orderId: existingActiveTableOrder._id, orderNumber: existingActiveTableOrder.orderNumber, tableNumber: table.tableNumber },
+      }).catch((e) => console.warn('[Order] In-app notification creation note:', e.message));
     } catch (socketErr) {
       console.warn('Socket notification error:', socketErr.message);
     }
@@ -726,6 +755,15 @@ export const placeOrderService = async (payload) => {
     emitToOrder(order._id, 'order-updated', order);
     emitToTable(table._id, 'order-updated', order);
     emitToAdmin(SOCKET_EVENTS.ORDER_CREATED, order);
+
+    createRestaurantNotification({
+      restaurantId: restaurant._id,
+      type: 'ORDER',
+      title: `New Order #${order.orderNumber}`,
+      message: `Table ${table.tableNumber || 'N/A'} - ${order.items?.length || 0} item(s) (₹${order.grandTotal})`,
+      link: '/orders',
+      metadata: { orderId: order._id, orderNumber: order.orderNumber, tableNumber: table.tableNumber },
+    }).catch((e) => console.warn('[Order] In-app notification creation note:', e.message));
   } catch (socketErr) {
     console.warn('Socket notification error:', socketErr.message);
   }

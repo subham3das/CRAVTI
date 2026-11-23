@@ -96,13 +96,16 @@ export const Navbar = ({ onOpenSidebar }) => {
         setNotifications((prev) => [payload.notification, ...prev]);
         setUnreadCount((c) => c + 1);
 
-        if (settings?.notificationSound !== false) {
-          playOrderChime();
+        // Order sounds & toasts are managed canonically by OrderNotificationWatcher
+        if (payload.notification?.type !== 'ORDER') {
+          if (settings?.notificationSound !== false) {
+            playOrderChime();
+          }
+          toast(payload.notification.title || 'New Notification', {
+            icon: '🔔',
+            duration: 4000,
+          });
         }
-        toast(payload.notification.title || 'New Notification', {
-          icon: '🔔',
-          duration: 4000,
-        });
       }
     });
 

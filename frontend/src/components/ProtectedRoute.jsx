@@ -20,15 +20,10 @@ export const ProtectedRoute = ({ children, requireRestaurant = true }) => {
   }
 
   // Subscription verification
-  // If subscription has expired, lock dashboard/operations and redirect to /subscription
+  // If subscription/trial has expired or access revoked, lock operations and redirect to /subscription
   const sub = restaurant?.subscription;
-  if (sub && sub.status) {
-    const isLocked =
-      sub.status === 'expired' ||
-      sub.status === 'cancelled' ||
-      sub.status === 'halted' ||
-      sub.status === 'suspended' ||
-      sub.canAccessFeatures === false;
+  if (sub) {
+    const isLocked = sub.canAccessFeatures === false || sub.status === 'expired';
 
     if (isLocked && location.pathname !== '/subscription') {
       return <Navigate to="/subscription" replace />;

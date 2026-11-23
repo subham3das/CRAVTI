@@ -5,7 +5,7 @@ import { PlatformInvoice } from '../models/PlatformInvoice.js';
 import { WebhookEvent } from '../models/WebhookEvent.js';
 import { SubscriptionHistory } from '../models/SubscriptionHistory.js';
 import { logFinanceAudit } from './auditService.js';
-import { calculateSubscriptionState } from '../utils/subscriptionUtils.js';
+import { getSubscriptionState, calculateSubscriptionState } from '../utils/subscriptionUtils.js';
 import { getRazorpayInstance, isRazorpayConfigured } from '../config/razorpay.js';
 import { emitToRestaurant } from '../config/socket.js';
 import env from '../config/env.js';
@@ -89,14 +89,16 @@ export const createSubscriptionService = async ({
     };
   }
 
-  // Update Restaurant subscription record
+  // Update Restaurant subscription record - preserve existing active trial/subscription status
+  const currentStatus = restaurant.subscription?.status || 'trial';
   restaurant.subscription = {
     ...restaurant.subscription,
     planName: 'Craviti Pro',
     planId: effectivePlanId,
     razorpayCustomerId: customerId,
     razorpaySubscriptionId: razorpaySubscription.id,
-    status: 'pending',
+    checkoutPending: true,
+    status: currentStatus === 'active' ? 'active' : 'trial',
   };
   await restaurant.save();
 
@@ -182,7 +184,7 @@ export const cancelSubscriptionService = async ({ restaurantId, user, cancelImme
  */
 export const getSubscriptionStatusService = async (restaurantId) => {
   const restId = new mongoose.Types.ObjectId(restaurantId);
-  const restaurant = await Restaurant.findById(restId).lean();
+  const restaurant = await Restaurant.findById(restId);
 
   if (!restaurant || restaurant.isDeleted) {
     const error = new Error('Restaurant not found');
@@ -190,7 +192,7 @@ export const getSubscriptionStatusService = async (restaurantId) => {
     throw error;
   }
 
-  const canonicalState = calculateSubscriptionState(restaurant.subscription, restaurant.createdAt);
+  const canonicalState = getSubscriptionState(restaurant);
 
   // Fetch billing history / platform invoices
   const billingHistory = await PlatformInvoice.find({ restaurantId: restId })

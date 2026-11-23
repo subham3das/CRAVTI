@@ -63,19 +63,29 @@ export const updatePaymentSettings = asyncHandler(async (req, res) => {
 
 export const getReceiptByOrder = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
-  let receipt = await Receipt.findOne({
-    $or: [{ orderId }, { orderNumber: orderId }],
-    restaurantId: req.restaurantId,
-    isDeleted: { $ne: true },
-  }).lean();
+  const restId = req.restaurantId;
+
+  let receipt = null;
+  if (mongoose.Types.ObjectId.isValid(orderId)) {
+    receipt = await Receipt.findOne({ orderId, restaurantId: restId, isDeleted: { $ne: true } }).lean();
+    if (!receipt) {
+      receipt = await Receipt.findOne({ _id: orderId, restaurantId: restId, isDeleted: { $ne: true } }).lean();
+    }
+  }
+  if (!receipt) {
+    receipt = await Receipt.findOne({ orderNumber: orderId, restaurantId: restId, isDeleted: { $ne: true } }).lean();
+  }
 
   if (!receipt) {
-    const orderQuery = mongoose.Types.ObjectId.isValid(orderId)
-      ? { _id: orderId, restaurantId: req.restaurantId, isDeleted: false }
-      : { orderNumber: orderId, restaurantId: req.restaurantId, isDeleted: false };
-    const order = await Order.findOne(orderQuery);
+    let order = null;
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      order = await Order.findOne({ _id: orderId, restaurantId: restId, isDeleted: { $ne: true } });
+    }
+    if (!order) {
+      order = await Order.findOne({ orderNumber: orderId, restaurantId: restId, isDeleted: { $ne: true } });
+    }
 
-    if (order && order.status === 'completed') {
+    if (order) {
       receipt = await generateReceiptSnapshot(order._id);
       if (receipt && receipt.toObject) {
         receipt = receipt.toObject();

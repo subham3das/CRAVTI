@@ -160,12 +160,31 @@ const renderThermal80mm = (receipt) => {
   doc.text(`Time: ${formatTimeSafe(completionDate)}`, leftX, y);
   y += 3.8;
 
-  const tableNum = tableSnap.tableNumber != null ? tableSnap.tableNumber : '-';
-  doc.text(`Table No: Table ${tableNum}`, leftX, y);
+  const isWalkIn =
+    !tableSnap.tableNumber ||
+    tableSnap.tableNumber === 0 ||
+    tableSnap.tableNumber === '0' ||
+    String(tableSnap.tableNumber).toLowerCase().includes('walk') ||
+    String(tableSnap.tableName || '').toLowerCase().includes('walk');
+
+  const tableDisplay = isWalkIn
+    ? 'Table: Walk-in Customer'
+    : `Table No: Table ${tableSnap.tableNumber}`;
+  doc.text(tableDisplay, leftX, y);
   y += 3.8;
 
+  const custName = guestSnap.customerName?.trim() || (isWalkIn ? 'Walk-in Customer' : 'Guest');
+  doc.text(`Customer: ${custName}`, leftX, y);
+  y += 3.8;
+
+  const custPhone = guestSnap.customerPhone?.trim();
+  if (custPhone) {
+    doc.text(`Phone: ${custPhone}`, leftX, y);
+    y += 3.8;
+  }
+
   const custId = guestSnap.customerId || guestSnap.guestId;
-  if (custId) {
+  if (custId && !isWalkIn) {
     doc.text(`Customer ID: ${custId}`, leftX, y);
     y += 3.8;
   }
@@ -316,7 +335,12 @@ const renderA4Invoice = (receipt) => {
   doc.setFontSize(10);
   doc.text(`Receipt No: ${receipt.receiptNumber || receipt.orderNumber}`, 14, 28);
   doc.text(`Date: ${formatDateSafe(receipt.completionTime || receipt.createdAt)}`, 14, 34);
-  doc.text(`Table: ${receipt?.tableSnapshot?.tableNumber || '-'}`, 14, 40);
+  const a4IsWalkIn =
+    !receipt?.tableSnapshot?.tableNumber ||
+    receipt?.tableSnapshot?.tableNumber === 0 ||
+    String(receipt?.tableSnapshot?.tableNumber).toLowerCase().includes('walk') ||
+    String(receipt?.tableSnapshot?.tableName || '').toLowerCase().includes('walk');
+  doc.text(`Type: ${a4IsWalkIn ? 'Walk-in Customer' : `Table ${receipt?.tableSnapshot?.tableNumber}`}`, 14, 40);
 
   let y = 52;
   doc.setFont('helvetica', 'bold');

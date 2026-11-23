@@ -70,7 +70,7 @@ const receiptSchema = new mongoose.Schema(
       website: { type: String, default: '' },
     },
     tableSnapshot: {
-      tableNumber: { type: Number, required: true },
+      tableNumber: { type: mongoose.Schema.Types.Mixed, required: false, default: 0 },
       tableName: { type: String, default: '' },
       floor: { type: String, default: '' },
     },

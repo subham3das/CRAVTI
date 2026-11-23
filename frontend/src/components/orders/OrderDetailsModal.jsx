@@ -41,8 +41,9 @@ export const OrderDetailsModal = ({
     try {
       setIsDownloadingReceipt(true);
       const res = await fetchOrderReceiptApi(order._id);
-      if (res.success && res.receipt) {
-        generateReceiptPdf(res.receipt, { template: RECEIPT_TEMPLATES.THERMAL_80MM });
+      const receiptData = res.receipt || res.data?.receipt;
+      if (res.success && receiptData) {
+        generateReceiptPdf(receiptData, { template: RECEIPT_TEMPLATES.THERMAL_80MM });
         toast.success('Thermal receipt downloaded successfully!');
       } else {
         toast.error(res.message || 'Unable to load receipt snapshot');
@@ -297,7 +298,7 @@ export const OrderDetailsModal = ({
             </div>
 
             <div className="flex items-center gap-2">
-              {order.status === 'completed' && (
+              {(order.status === 'completed' || order.paymentStatus === 'paid' || order.paymentStatus === 'paid_cash' || order.paymentStatus === 'paid_online') && (
                 <button
                   type="button"
                   onClick={handleDownloadReceipt}

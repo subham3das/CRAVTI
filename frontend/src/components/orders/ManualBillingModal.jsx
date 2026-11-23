@@ -456,9 +456,10 @@ export const ManualBillingModal = ({
     }
     try {
       const res = await printManualOrderReceiptApi(ordId);
-      if (res.success && res.receipt) {
+      const receipt = res.receipt || res.data?.receipt;
+      if (res.success && receipt) {
         if (onOpenReceipt) {
-          onOpenReceipt(res.receipt);
+          onOpenReceipt(receipt);
         } else {
           toast.success('Receipt ready for printing');
         }

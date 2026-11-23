@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { calculateSubscriptionState } from '../utils/subscriptionUtils.js';
+import { getSubscriptionState, calculateSubscriptionState } from '../utils/subscriptionUtils.js';
 
 const restaurantSchema = new mongoose.Schema(
   {
@@ -149,6 +149,9 @@ const restaurantSchema = new mongoose.Schema(
         default: 'trial',
         index: true,
       },
+      registrationDate: {
+        type: Date,
+      },
       trialStartDate: {
         type: Date,
       },
@@ -160,11 +163,11 @@ const restaurantSchema = new mongoose.Schema(
       },
       subscriptionStart: {
         type: Date,
-        default: Date.now,
+        default: null,
       },
       subscriptionEnd: {
         type: Date,
-        default: () => new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        default: null,
       },
       nextBillingDate: {
         type: Date,
@@ -224,6 +227,10 @@ const restaurantSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    registrationDate: {
+      type: Date,
+      default: Date.now,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -243,18 +250,14 @@ const restaurantSchema = new mongoose.Schema(
     toJSON: {
       virtuals: true,
       transform: (doc, ret) => {
-        if (ret.subscription) {
-          ret.subscription = calculateSubscriptionState(ret.subscription, ret.createdAt);
-        }
+        ret.subscription = getSubscriptionState(ret);
         return ret;
       },
     },
     toObject: {
       virtuals: true,
       transform: (doc, ret) => {
-        if (ret.subscription) {
-          ret.subscription = calculateSubscriptionState(ret.subscription, ret.createdAt);
-        }
+        ret.subscription = getSubscriptionState(ret);
         return ret;
       },
     },
@@ -262,29 +265,47 @@ const restaurantSchema = new mongoose.Schema(
 );
 
 restaurantSchema.pre('save', function (next) {
-  if (this.isModified('subscription') || !this.subscription || !this.subscription.trialEndDate) {
-    if (!this.subscription) this.subscription = {};
-    const sub = this.subscription;
-    const start = sub.trialStartDate || sub.subscriptionStart || this.createdAt || new Date();
-    sub.trialStartDate = start;
-    if (!sub.trialEndDate) {
-      sub.trialEndDate = sub.trialEndsAt || new Date(new Date(start).getTime() + 14 * 24 * 60 * 60 * 1000);
-    }
-    sub.trialEndsAt = sub.trialEndDate;
+  // 1. Permanently anchor registration date
+  if (!this.registrationDate) {
+    this.registrationDate = this.createdAt || new Date();
   }
+
+  // 2. Ensure subscription subdocument exists
+  if (!this.subscription) {
+    this.subscription = {};
+  }
+
+  const sub = this.subscription;
+  sub.registrationDate = sub.registrationDate || this.registrationDate;
+
+  // 3. Permanently anchor trialStartDate to registrationDate (IMMUTABLE)
+  if (!sub.trialStartDate) {
+    sub.trialStartDate = this.registrationDate;
+  }
+
+  // 4. Permanently anchor trialEndDate to trialStartDate + exactly 14 full days (14 * 24 * 60 * 60 * 1000)
+  if (!sub.trialEndDate) {
+    if (sub.trialEndsAt) {
+      sub.trialEndDate = sub.trialEndsAt;
+    } else {
+      sub.trialEndDate = new Date(new Date(sub.trialStartDate).getTime() + 14 * 24 * 60 * 60 * 1000);
+    }
+  }
+  sub.trialEndsAt = sub.trialEndDate;
+
   next();
 });
 
 restaurantSchema.methods.getSubscriptionState = function () {
-  return calculateSubscriptionState(this.subscription, this.createdAt);
+  return getSubscriptionState(this);
 };
 
 restaurantSchema.virtual('subscription.trialDaysRemaining').get(function () {
-  return calculateSubscriptionState(this.subscription, this.createdAt).trialDaysRemaining;
+  return getSubscriptionState(this).trialDaysRemaining;
 });
 
 restaurantSchema.virtual('subscription.subscriptionStatus').get(function () {
-  return calculateSubscriptionState(this.subscription, this.createdAt).subscriptionStatus;
+  return getSubscriptionState(this).subscriptionStatus;
 });
 
 restaurantSchema.index({ slug: 1, isDeleted: 1 });
