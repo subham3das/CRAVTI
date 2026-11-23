@@ -147,10 +147,11 @@ export const AUDIT_ACTIONS = {
   RESTORE_BACKUP: 'RESTORE_BACKUP',
 };
 
-// Phase 3: SaaS Subscription Plans
+// Phase 3: SaaS Subscription Plans - Craviti Pro Only
 export const SUBSCRIPTION_PLANS = {
-  STARTER: 'starter',
+  PRO: 'pro',
   PROFESSIONAL: 'professional',
+  STARTER: 'starter',
   ENTERPRISE: 'enterprise',
 };
 
@@ -159,30 +160,48 @@ export const SUBSCRIPTION_STATUS = {
   SUSPENDED: 'suspended',
   EXPIRED: 'expired',
   TRIAL: 'trial',
+  CANCELLED: 'cancelled',
+  PENDING: 'pending',
 };
 
 export const PLAN_CONFIG = {
-  [SUBSCRIPTION_PLANS.STARTER]: {
-    name: 'Starter Plan',
-    maxTables: 5,
-    maxMenuItems: 30,
-    priceMonthly: 0,
-    commissionPercent: 5.0,
+  [SUBSCRIPTION_PLANS.PRO]: {
+    name: 'Craviti Pro',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
     features: {
-      analyticsAccess: false,
+      analyticsAccess: true,
       onlinePayments: true,
-      customBranding: false,
+      customBranding: true,
       qrOrdering: true,
-      prioritySupport: false,
-      receiptBranding: false,
-      multipleStaffAccounts: false,
+      prioritySupport: true,
+      receiptBranding: true,
+      multipleStaffAccounts: true,
     },
   },
   [SUBSCRIPTION_PLANS.PROFESSIONAL]: {
-    name: 'Professional Plan',
-    maxTables: 25,
-    maxMenuItems: 150,
-    priceMonthly: 699, // Launch Offer (Regular ₹1,500)
+    name: 'Craviti Pro',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
+    features: {
+      analyticsAccess: true,
+      onlinePayments: true,
+      customBranding: true,
+      qrOrdering: true,
+      prioritySupport: true,
+      receiptBranding: true,
+      multipleStaffAccounts: true,
+    },
+  },
+  [SUBSCRIPTION_PLANS.STARTER]: {
+    name: 'Craviti Pro',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
     commissionPercent: 2.5,
     features: {
       analyticsAccess: true,
@@ -195,11 +214,11 @@ export const PLAN_CONFIG = {
     },
   },
   [SUBSCRIPTION_PLANS.ENTERPRISE]: {
-    name: 'Enterprise Plan',
-    maxTables: 100,
-    maxMenuItems: 1000,
-    priceMonthly: 3999,
-    commissionPercent: 1.0,
+    name: 'Craviti Pro',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
     features: {
       analyticsAccess: true,
       onlinePayments: true,

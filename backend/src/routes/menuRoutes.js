@@ -11,12 +11,13 @@ import {
 } from '../controllers/menuController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import { upload } from '../middleware/uploadMiddleware.js';
 import { validateRequest } from '../middleware/validatorMiddleware.js';
 
 const router = Router();
 
-router.use(protect, requireRestaurant);
+router.use(protect, requireRestaurant, verifySubscription);
 
 router.get('/stats', getMenuStats);
 router.get('/', getMenuItems);

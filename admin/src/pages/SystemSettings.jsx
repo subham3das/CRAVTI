@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiSave, FiSliders, FiShield, FiAlertTriangle, FiMail, FiCreditCard, FiCloud, FiServer } from 'react-icons/fi';
+import { FiSave, FiSliders, FiShield, FiAlertTriangle, FiMail, FiCreditCard, FiCloud, FiServer, FiLock } from 'react-icons/fi';
 import { fetchSystemSettingsApi, updateSystemSettingsApi } from '../services/adminService';
 import { Skeleton } from '../components/Skeleton';
 import toast from 'react-hot-toast';
@@ -176,11 +176,17 @@ export const SystemSettings = () => {
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Razorpay Live Key ID</label>
-                <input
-                  type="text"
-                  {...register('razorpayKeyId')}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    readOnly
+                    {...register('razorpayKeyId')}
+                    className="w-full px-3.5 py-2.5 pr-9 bg-slate-50 border border-slate-200 rounded-xl font-mono opacity-70 cursor-not-allowed"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                    <FiLock className="w-4 h-4" />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

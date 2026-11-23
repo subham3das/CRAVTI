@@ -449,21 +449,8 @@ export const placeOrderService = async (payload) => {
     throw error;
   }
 
-  // 3. Resolve Table with temporary diagnostic logging
+  // 3. Resolve Table
   const rawTable = payload.tableId || payload.tableIdentifier || payload.tableNumber || payload.table;
-
-  console.log('[Table Resolution Debug: Place Order Request]', {
-    restaurantId: restaurant._id,
-    tableId: payload.tableId,
-    tableNumber: payload.tableNumber,
-    tableIdentifier: payload.tableIdentifier,
-    incomingPayload: {
-      restaurantSlug: payload.restaurantSlug,
-      paymentMethod: payload.paymentMethod,
-      guestId,
-      itemsCount: items?.length,
-    },
-  });
 
   if (!rawTable || String(rawTable).trim() === '' || String(rawTable).trim() === 'undefined' || String(rawTable).trim() === 'null') {
     const error = new Error('Invalid table information. Please scan QR code again.');
@@ -474,20 +461,6 @@ export const placeOrderService = async (payload) => {
   const table = (await resolveRestaurantTable(restaurant._id, rawTable)) ||
     (payload.tableNumber ? await resolveRestaurantTable(restaurant._id, payload.tableNumber) : null) ||
     (payload.tableIdentifier ? await resolveRestaurantTable(restaurant._id, payload.tableIdentifier) : null);
-
-  console.log('[Table Resolution Debug: Place Order Result]', {
-    restaurantId: restaurant._id,
-    rawTable,
-    databaseLookupResult: table
-      ? {
-          _id: table._id,
-          tableNumber: table.tableNumber,
-          tableName: table.tableName,
-          status: table.status,
-          isActive: table.isActive,
-        }
-      : null,
-  });
 
   if (!table) {
     const error = new Error('Invalid table information. Please scan QR code again.');

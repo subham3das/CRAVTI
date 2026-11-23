@@ -11,6 +11,7 @@ import { generateReceiptSnapshot } from './orderService.js';
 import { emitToRestaurant, emitToOrder, emitToTable, emitToAdmin } from '../config/socket.js';
 import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { getImageUrl } from '../utils/imageUtils.js';
+import { recordOrderSettlement } from './settlementService.js';
 
 export const sanitizeManualOrder = (order) => {
   if (!order) return order;
@@ -292,6 +293,15 @@ export const createManualOrderService = async ({ restaurantId, user, payload = {
       ],
     });
     await payment.save();
+
+    recordOrderSettlement({
+      orderId: order._id,
+      orderNumber: order.orderNumber,
+      restaurantId: restId,
+      amount: order.grandTotal,
+      paymentMethod,
+      paymentId: payment._id,
+    }).catch((e) => console.warn('[Manual Order] Settlement ledger note:', e.message));
 
     receipt = await generateReceiptSnapshot(order._id);
   }
@@ -688,6 +698,15 @@ export const markManualOrderPaidService = async ({
     ],
   });
   await payment.save();
+
+  recordOrderSettlement({
+    orderId: activeOrder._id,
+    orderNumber: activeOrder.orderNumber,
+    restaurantId: restId,
+    amount: activeOrder.grandTotal,
+    paymentMethod,
+    paymentId: payment._id,
+  }).catch((e) => console.warn('[Manual Order] Settlement ledger note:', e.message));
 
   // Generate Receipt Snapshot
   const receipt = await generateReceiptSnapshot(activeOrder._id);

@@ -16,6 +16,10 @@ import healthRoutes from './healthRoutes.js';
 import analyticsRoutes from './analyticsRoutes.js';
 import restaurantPaymentRoutes from './restaurantPaymentRoutes.js';
 import customerRoutes from './customerRoutes.js';
+import subscriptionRoutes from './subscriptionRoutes.js';
+import webhookRoutes from './webhookRoutes.js';
+import adminFinanceRoutes from './adminFinanceRoutes.js';
+import restaurantFinanceRoutes from './restaurantFinanceRoutes.js';
 import {
   getPlatformRevenueStats,
   getPlatformSubscriptions,
@@ -47,6 +51,9 @@ router.use('/manual-orders', manualOrderRoutes);
 router.use('/customer', customerRoutes); // Customer public menu & categories APIs
 router.use('/settings', settingsRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/subscription', subscriptionRoutes);
+router.use('/webhooks', webhookRoutes);
+router.use('/finance', restaurantFinanceRoutes);
 
 // Public Contact Form Endpoint (SMTP Dispatched to contactcraviti@gmail.com)
 router.post('/contact', submitContactInquiry);
@@ -78,6 +85,9 @@ router.get('/billing/invoices', (req, res, next) => {
   }
   return getPlatformInvoices(req, res, next);
 });
+
+// Admin Finance Dedicated Namespace
+router.use('/admin/finance', adminFinanceRoutes);
 
 // Admin Panel Dedicated Namespace
 router.use('/admin', adminRoutes);

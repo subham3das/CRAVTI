@@ -16,7 +16,7 @@ import { MenuItem } from '../models/MenuItem.js';
 import { Category } from '../models/Category.js';
 import { Order } from '../models/Order.js';
 
-const API_BASE = 'http://localhost:5001/api';
+const API_BASE = process.env.API_URL || 'http://localhost:5000/api';
 
 async function runTests() {
   console.log('\n======================================================');

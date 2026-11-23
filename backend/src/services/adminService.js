@@ -514,11 +514,27 @@ export const updateRestaurantVerificationWorkflowService = async (
 
   // Phase 4.2: Dispatch Restaurant In-App Notification and Real-time Socket Event
   if (status === VERIFICATION_STATUS.VERIFIED) {
+    // Each newly approved restaurant automatically receives 14-day free trial
+    const now = new Date();
+    const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+    restaurant.subscription = restaurant.subscription || {};
+    if (!restaurant.subscription.status || restaurant.subscription.status === 'trial') {
+      restaurant.subscription.status = 'trial';
+      restaurant.subscription.planName = 'Craviti Pro';
+      restaurant.subscription.planId = env.RAZORPAY_BASIC_PLAN_ID || '';
+      restaurant.subscription.trialStartDate = now;
+      restaurant.subscription.trialEndDate = trialEnd;
+      restaurant.subscription.trialEndsAt = trialEnd;
+      restaurant.subscription.subscriptionStart = now;
+      restaurant.subscription.subscriptionEnd = trialEnd;
+    }
+    await restaurant.save();
+
     await createRestaurantNotification({
       restaurantId: restaurant._id,
       type: 'APPROVAL',
       title: 'Restaurant Account Verified',
-      message: 'Congratulations! Your restaurant has been officially verified by the Craviti Compliance Team.',
+      message: 'Congratulations! Your restaurant has been officially verified by the Craviti Compliance Team. Your 14-day free trial is now active.',
       link: '/dashboard',
     });
     emitSyncEvent({
@@ -1883,8 +1899,6 @@ export const getBusinessDashboardStatsService = async () => {
  * Module 2: Platform Revenue Center
  */
 export const getPlatformRevenueStatsService = async ({ startDate = '', endDate = '' } = {}) => {
-  console.log('[Revenue] Service Entered: getPlatformRevenueStatsService', { startDate, endDate });
-
   const query = { status: 'completed', isDeleted: false };
   if (startDate || endDate) {
     query.createdAt = {};
@@ -1916,7 +1930,6 @@ export const getPlatformRevenueStatsService = async ({ startDate = '', endDate =
   let invoicesPaid = [];
   let topRestaurantsAgg = [];
 
-  console.log('[Revenue] Mongo Query Started');
   try {
     const results = await Promise.all([
       Order.find(query).select('grandTotal restaurantId createdAt').lean(),
@@ -1962,7 +1975,6 @@ export const getPlatformRevenueStatsService = async ({ startDate = '', endDate =
     cancelledOrders = results[3] || [];
     invoicesPaid = results[4] || [];
     topRestaurantsAgg = results[5] || [];
-    console.log('[Revenue] Mongo Query Finished successfully');
   } catch (err) {
     console.error('[Revenue Service Error] Mongo Query failed:', err.stack || err);
     // Graceful zero-value fallback on error
@@ -2065,18 +2077,64 @@ export const getPlatformSubscriptionsService = async ({ search = '', plan = 'all
     }
   }
 
-  const [subscriptions, total] = await Promise.all([
+  const [subscriptions, total, allSubs] = await Promise.all([
     Subscription.find(query)
-      .populate('restaurantId', 'restaurantName slug logo ownerName ownerPhone email')
+      .populate('restaurantId', 'restaurantName slug logo ownerName ownerPhone email subscription')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
       .lean(),
     Subscription.countDocuments(query),
+    Subscription.find({ isDeleted: false }).lean(),
   ]);
+
+  let mrr = 0;
+  let totalActive = 0;
+  let totalExpired = 0;
+  let totalPending = 0;
+  let totalTrials = 0;
+  let renewalsToday = 0;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  for (const s of allSubs) {
+    const st = (s.status || '').toLowerCase();
+    if (st === 'active') {
+      totalActive++;
+      mrr += Number(s.priceMonthly) || 1999;
+    } else if (st === 'trial') {
+      totalTrials++;
+    } else if (st === 'expired' || st === 'cancelled') {
+      totalExpired++;
+    } else if (st === 'pending') {
+      totalPending++;
+    }
+
+    if (s.currentPeriodEnd) {
+      const endD = new Date(s.currentPeriodEnd);
+      if (endD >= startOfToday && endD <= endOfToday) {
+        renewalsToday++;
+      }
+    }
+  }
+
+  const metrics = {
+    monthlyRevenue: mrr,
+    mrr,
+    arr: mrr * 12,
+    totalActive,
+    totalExpired,
+    totalPending,
+    totalTrials,
+    renewalsToday,
+    planId: env.RAZORPAY_BASIC_PLAN_ID || '',
+  };
 
   return {
     subscriptions: subscriptions.filter((s) => s.restaurantId),
+    metrics,
     pagination: {
       total,
       page: pageNum,
@@ -2086,49 +2144,78 @@ export const getPlatformSubscriptionsService = async ({ search = '', plan = 'all
   };
 };
 
-export const updateRestaurantSubscriptionService = async (restaurantId, { plan, action, reason = '' }, admin = null) => {
-  let sub = await Subscription.findOne({ restaurantId });
+export const updateRestaurantSubscriptionService = async (restaurantId, { plan = 'pro', action, reason = '', days = 14 }, admin = null) => {
+  const restId = new mongoose.Types.ObjectId(restaurantId);
+  const restaurant = await Restaurant.findById(restId);
+  if (!restaurant || restaurant.isDeleted) {
+    throw new Error('Restaurant not found');
+  }
+
+  let sub = await Subscription.findOne({ restaurantId: restId });
   if (!sub) {
-    sub = new Subscription({ restaurantId });
+    sub = new Subscription({ restaurantId: restId });
   }
 
-  const oldPlan = sub.plan;
-  const config = PLAN_CONFIG[plan] || PLAN_CONFIG[SUBSCRIPTION_PLANS.STARTER];
+  const oldPlan = restaurant.subscription?.planName || sub.plan || 'Craviti Pro';
+  const now = new Date();
 
-  if (action === 'upgrade' || action === 'downgrade') {
-    sub.plan = plan;
-    sub.maxTables = config.maxTables;
-    sub.maxMenuItems = config.maxMenuItems;
-    sub.priceMonthly = config.priceMonthly;
-    sub.commissionPercent = config.commissionPercent;
-    sub.features = config.features;
-    sub.status = SUBSCRIPTION_STATUS.ACTIVE;
+  restaurant.subscription = restaurant.subscription || {};
+
+  if (action === 'extend_trial') {
+    const currentTrialEnd = restaurant.subscription.trialEndDate || restaurant.subscription.trialEndsAt || now;
+    const baseDate = new Date(currentTrialEnd) > now ? new Date(currentTrialEnd) : now;
+    const newTrialEnd = new Date(baseDate.getTime() + (Number(days) || 14) * 24 * 60 * 60 * 1000);
+
+    restaurant.subscription.status = 'trial';
+    restaurant.subscription.trialEndDate = newTrialEnd;
+    restaurant.subscription.trialEndsAt = newTrialEnd;
+    sub.status = 'trial';
+    sub.currentPeriodEnd = newTrialEnd;
+  } else if (action === 'activate' || action === 'upgrade' || action === 'renew') {
+    const currentEnd = restaurant.subscription.subscriptionEnd ? new Date(restaurant.subscription.subscriptionEnd) : now;
+    const baseDate = currentEnd > now ? currentEnd : now;
+    const newEnd = new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    restaurant.subscription.status = 'active';
+    restaurant.subscription.planName = 'Craviti Pro';
+    restaurant.subscription.subscriptionStart = now;
+    restaurant.subscription.subscriptionEnd = newEnd;
+    restaurant.subscription.nextBillingDate = newEnd;
+
+    sub.plan = 'pro';
+    sub.status = 'active';
+    sub.priceMonthly = 699;
+    sub.currentPeriodStart = now;
+    sub.currentPeriodEnd = newEnd;
   } else if (action === 'suspend') {
-    sub.status = SUBSCRIPTION_STATUS.SUSPENDED;
-  } else if (action === 'renew') {
-    sub.status = SUBSCRIPTION_STATUS.ACTIVE;
-    sub.currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    restaurant.subscription.status = 'suspended';
+    sub.status = 'suspended';
+  } else if (action === 'cancel') {
+    restaurant.subscription.status = 'cancelled';
+    sub.status = 'cancelled';
   } else if (action === 'expire') {
-    sub.status = SUBSCRIPTION_STATUS.EXPIRED;
+    restaurant.subscription.status = 'expired';
+    sub.status = 'expired';
   }
+
+  await restaurant.save();
 
   sub.history.push({
     action: action || 'plan_change',
     fromPlan: oldPlan,
-    toPlan: sub.plan,
-    changedBy: admin?.email || 'admin',
+    toPlan: restaurant.subscription.planName || 'Craviti Pro',
+    changedBy: admin?.email || admin?.name || 'admin',
     timestamp: new Date(),
-    reason,
+    reason: reason || `Admin action: ${action}`,
   });
-
   await sub.save();
 
-  // Phase 4.2: Real-time synchronization of subscription limits
+  // Real-time synchronization
   await createRestaurantNotification({
     restaurantId,
     type: 'SUBSCRIPTION',
-    title: 'Subscription Plan Updated',
-    message: `Your account subscription has been set to ${sub.plan.toUpperCase()}. Tables limit: ${sub.maxTables}, Menu items limit: ${sub.maxMenuItems}.`,
+    title: 'Subscription Status Updated',
+    message: `Your account subscription status has been updated to ${restaurant.subscription.status.toUpperCase()} by platform admin.`,
     link: '/dashboard',
   });
 
@@ -2136,10 +2223,9 @@ export const updateRestaurantSubscriptionService = async (restaurantId, { plan, 
     event: SOCKET_EVENTS.RESTAURANT_SUBSCRIPTION_UPDATED,
     restaurantId,
     data: {
-      plan: sub.plan,
-      status: sub.status,
-      maxTables: sub.maxTables,
-      maxMenuItems: sub.maxMenuItems,
+      plan: 'Craviti Pro',
+      status: restaurant.subscription.status,
+      subscription: restaurant.subscription,
     },
   });
 
@@ -2149,7 +2235,7 @@ export const updateRestaurantSubscriptionService = async (restaurantId, { plan, 
     action: AUDIT_ACTIONS.SUBSCRIPTION_UPGRADE,
     targetType: 'Subscription',
     targetId: sub._id,
-    details: { action, fromPlan: oldPlan, toPlan: sub.plan, reason },
+    details: { action, fromPlan: oldPlan, toPlan: 'Craviti Pro', reason },
     reason: `Subscription ${action} executed for restaurant ${restaurantId}`,
   });
 

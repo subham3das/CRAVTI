@@ -184,6 +184,13 @@ api.interceptors.response.use(
         if (serverMessage && !currentPath.startsWith('/order/')) {
           toast.error(serverMessage || 'Access denied.');
         }
+        if (
+          (error.response?.data?.error === 'SUBSCRIPTION_EXPIRED' || error.response?.data?.redirectUrl === '/subscription') &&
+          !currentPath.startsWith('/order/') &&
+          window.location.pathname !== '/subscription'
+        ) {
+          window.location.href = '/subscription';
+        }
         break;
 
       case 404:

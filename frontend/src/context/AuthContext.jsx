@@ -113,6 +113,7 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         restaurant,
+        subscription: restaurant?.subscription || null,
         loading,
         isAuthenticated: !!user,
         hasRestaurant: !!(user?.restaurantId || restaurant?._id),
@@ -121,6 +122,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         setRestaurant,
         refreshRestaurant,
+        refreshUser: fetchSession,
       }}
     >
       {children}

@@ -21,7 +21,6 @@ export const loadRazorpayScript = () => {
         return resolve(true);
       }
       existing.addEventListener('load', () => {
-        console.log('[Razorpay Flow] SDK Loaded');
         resolve(true);
       });
       existing.addEventListener('error', (err) => {
@@ -36,7 +35,6 @@ export const loadRazorpayScript = () => {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.async = true;
     script.onload = () => {
-      console.log('[Razorpay Flow] SDK Loaded');
       resolve(true);
     };
     script.onerror = (err) => {
@@ -59,7 +57,6 @@ export const openRazorpayModal = async ({
   onDismiss,
   onError,
 }) => {
-  console.log('[Razorpay Flow] Checking SDK availability...');
   const loaded = await loadRazorpayScript();
   if (!loaded || !window.Razorpay) {
     const sdkErr = new Error('Failed to load Razorpay payment gateway. Please check your internet connection.');
@@ -98,17 +95,12 @@ export const openRazorpayModal = async ({
     },
     modal: {
       ondismiss: () => {
-        console.log('[Razorpay Flow] Modal Dismissed by user');
         onDismiss && onDismiss();
       },
       escape: true,
       backdropclose: false,
     },
     handler: (response) => {
-      console.log('[Razorpay Flow] Payment Success received from checkout:', {
-        razorpay_order_id: response.razorpay_order_id,
-        razorpay_payment_id: response.razorpay_payment_id,
-      });
       onSuccess &&
         onSuccess({
           razorpayOrderId: response.razorpay_order_id,
@@ -124,7 +116,6 @@ export const openRazorpayModal = async ({
       console.error('[Razorpay Flow] Payment Failed event:', resp.error);
       onError && onError(resp.error || new Error('Payment failed at checkout'));
     });
-    console.log('[Razorpay Flow] Checkout Opened');
     rzp.open();
   } catch (err) {
     console.error('[Razorpay Flow] Exception opening checkout:', err);

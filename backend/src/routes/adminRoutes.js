@@ -60,6 +60,12 @@ import {
   getRealtimeActivityFeed,
   getComprehensivePlatformAnalytics,
 } from '../controllers/adminController.js';
+import {
+  getAdminSettlements,
+  getAdminRestaurantWallets,
+  processAdminSettlement,
+  updateAdminRestaurantCommission,
+} from '../controllers/adminSettlementController.js';
 import { getAdminPayments, refundPayment } from '../controllers/paymentController.js';
 import { adminProtect, requireAdminRole, requirePermission } from '../middleware/adminAuthMiddleware.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -95,11 +101,6 @@ router.patch('/notifications/:id/read', markAdminNotificationRead);
 // Platform Revenue Center (Module 2)
 router.get(
   '/revenue',
-  (req, res, next) => {
-    console.log(`[Revenue] Incoming Request: ${req.method} ${req.originalUrl}`);
-    console.log(`[Revenue] Matched Route: GET /api/admin/revenue`);
-    next();
-  },
   requirePermission(PERMISSIONS.ANALYTICS_VIEW),
   getPlatformRevenueStats
 );
@@ -191,6 +192,12 @@ router.post('/admins', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), createAdmin);
 router.post('/admins/invite', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), inviteAdmin);
 router.patch('/admins/:id/status', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), updateAdminStatus);
 router.patch('/admins/:id/role', requireAdminRole(ADMIN_ROLES.SUPER_ADMIN), updateAdminRole);
+
+// Settlements Management (Admin)
+router.get('/settlements', getAdminSettlements);
+router.get('/settlements/wallets', getAdminRestaurantWallets);
+router.post('/settlements/process', processAdminSettlement);
+router.patch('/settlements/commission', updateAdminRestaurantCommission);
 
 function requireRoleOrSuperAdmin(role) {
   return requireAdminRole(role);

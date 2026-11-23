@@ -21,6 +21,7 @@ import { getAdminOrders } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import env from '../config/env.js';
 
 const router = Router();
@@ -54,12 +55,12 @@ router.get('/:id/receipt', getOrderReceipt);
 // ==========================================
 // Authenticated Restaurant Order Management
 // ==========================================
-router.get('/live', protect, requireRestaurant, getLiveOrders);
-router.get('/history', protect, requireRestaurant, getHistoricalOrders);
-router.get('/metrics', protect, requireRestaurant, getOrderMetrics);
-router.patch('/:id/status', protect, requireRestaurant, updateOrderStatus);
-router.patch('/:id/payment', protect, requireRestaurant, updatePaymentStatus);
-router.delete('/:id', protect, requireRestaurant, softDeleteOrder);
+router.get('/live', protect, requireRestaurant, verifySubscription, getLiveOrders);
+router.get('/history', protect, requireRestaurant, verifySubscription, getHistoricalOrders);
+router.get('/metrics', protect, requireRestaurant, verifySubscription, getOrderMetrics);
+router.patch('/:id/status', protect, requireRestaurant, verifySubscription, updateOrderStatus);
+router.patch('/:id/payment', protect, requireRestaurant, verifySubscription, updatePaymentStatus);
+router.delete('/:id', protect, requireRestaurant, verifySubscription, softDeleteOrder);
 
 // GET /api/orders (Plural) - Smart route supporting Admin or Restaurant Owner
 router.get('/', (req, res, next) => {
@@ -82,7 +83,7 @@ router.get('/', (req, res, next) => {
   }
   return protect(req, res, (err) => {
     if (err) return next(err);
-    requireRestaurant(req, res, () => getHistoricalOrders(req, res, next));
+    requireRestaurant(req, res, () => verifySubscription(req, res, () => getHistoricalOrders(req, res, next)));
   });
 });
 

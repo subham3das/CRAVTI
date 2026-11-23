@@ -302,10 +302,8 @@ export const getBusinessDashboard = asyncHandler(async (req, res) => {
 });
 
 export const getPlatformRevenueStats = asyncHandler(async (req, res) => {
-  console.log('[Revenue] Controller Entered: getPlatformRevenueStats - Query:', req.query);
   try {
     const data = await getPlatformRevenueStatsService(req.query);
-    console.log('[Revenue] Response Sent: 200 OK');
     return sendSuccess(res, 'Platform revenue metrics loaded', data, HTTP_STATUS.OK, data);
   } catch (error) {
     console.error('[Revenue Controller Error]:', error.stack || error);

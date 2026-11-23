@@ -19,6 +19,7 @@ import {
   FiInfo,
   FiX,
   FiCheckCircle,
+  FiLock,
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -60,6 +61,7 @@ export const RestaurantProfile = () => {
             accountNumber: r.bankDetails?.accountNumber || '',
             ifscCode: r.bankDetails?.ifscCode || '',
             upiId: r.bankDetails?.upiId || '',
+            linkedAccountId: r.linkedAccountId || '',
           });
           if (r.coverImage?.url) {
             setCoverPreview(r.coverImage.url);
@@ -130,8 +132,12 @@ export const RestaurantProfile = () => {
           accountNumber: data.accountNumber,
           ifscCode: data.ifscCode,
           upiId: data.upiId,
+          linkedAccountId: data.linkedAccountId,
         })
       );
+      if (data.linkedAccountId !== undefined) {
+        formData.append('linkedAccountId', data.linkedAccountId);
+      }
 
       if (coverFile) {
         formData.append('coverImage', coverFile);
@@ -403,6 +409,18 @@ export const RestaurantProfile = () => {
                 label="Business UPI ID"
                 placeholder="e.g. restaurant@okhdfcbank"
                 {...register('upiId')}
+              />
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <Input
+                label="Razorpay Route Account ID (Linked Merchant Account)"
+                placeholder="e.g. acc_1234567890ABCD"
+                helperText="Your official Razorpay Linked Route Account ID. Required for automated direct merchant settlements."
+                readOnly
+                rightIcon={FiLock}
+                className="opacity-70 cursor-not-allowed bg-slate-50/60 font-mono"
+                {...register('linkedAccountId')}
               />
             </div>
           </div>

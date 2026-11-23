@@ -17,8 +17,6 @@ import env from '../config/env.js';
  * Customer creates Razorpay payment order for their active order or PREPAY cart checkout
  */
 export const createPaymentOrder = asyncHandler(async (req, res) => {
-  console.log("Payment payload:", req.body);
-
   const {
     restaurantId,
     tableId,
@@ -76,7 +74,6 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
     grandTotal,
   });
 
-  console.log('[Razorpay Flow] Response Sent successfully for Razorpay Order:', orderData.razorpayOrderId);
   return sendSuccess(res, 'Payment order created successfully', orderData, HTTP_STATUS.CREATED);
 });
 
@@ -86,7 +83,6 @@ export const createPaymentOrder = asyncHandler(async (req, res) => {
  */
 export const verifyPayment = asyncHandler(async (req, res) => {
   const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-  console.log('[Razorpay Flow] Verification Started for Razorpay Order:', { razorpayOrderId, razorpayPaymentId });
 
   const result = await verifyPaymentService({
     orderId,
@@ -95,7 +91,6 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     razorpaySignature,
   });
 
-  console.log('[Razorpay Flow] Verification Success:', { verified: result.verified, orderId: result.order?._id });
   return sendSuccess(res, 'Payment verified successfully', result, HTTP_STATUS.OK);
 });
 

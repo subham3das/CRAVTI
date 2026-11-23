@@ -12,6 +12,8 @@ const Restaurants = lazy(() => import('../pages/Restaurants').then((m) => ({ def
 const RestaurantDetails = lazy(() => import('../pages/RestaurantDetails').then((m) => ({ default: m.RestaurantDetails })));
 const RestaurantVerification = lazy(() => import('../pages/RestaurantVerification').then((m) => ({ default: m.RestaurantVerification })));
 const Subscriptions = lazy(() => import('../pages/Subscriptions').then((m) => ({ default: m.Subscriptions })));
+const Settlements = lazy(() => import('../pages/Settlements').then((m) => ({ default: m.Settlements })));
+const Finance = lazy(() => import('../pages/Finance').then((m) => ({ default: m.Finance })));
 const Billing = lazy(() => import('../pages/Billing').then((m) => ({ default: m.Billing })));
 const Orders = lazy(() => import('../pages/Orders').then((m) => ({ default: m.Orders })));
 const Analytics = lazy(() => import('../pages/Analytics').then((m) => ({ default: m.Analytics })));
@@ -51,6 +53,8 @@ export const AppRoutes = () => {
           <Route path="restaurants/:restaurantId" element={<RestaurantDetails />} />
           <Route path="verification" element={<RestaurantVerification />} />
           <Route path="subscriptions" element={<Subscriptions />} />
+          <Route path="settlements" element={<Settlements />} />
+          <Route path="finance" element={<Finance />} />
           <Route path="billing" element={<Billing />} />
           <Route path="orders" element={<Orders />} />
           <Route path="analytics" element={<Analytics />} />

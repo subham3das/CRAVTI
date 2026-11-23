@@ -419,10 +419,6 @@ const CustomerMenuContent = () => {
           grandTotal: calculatedGrandTotal,
         };
 
-        console.log('[Razorpay Flow] 1. Button Clicked (Online Payment)');
-        console.log('[Razorpay Flow] 2. Payload Built:', paymentPayload);
-        console.log('[Razorpay Flow] 3. API Started: POST /api/payment/create-order');
-
         // 20-second timeout with AbortController
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
@@ -438,13 +434,9 @@ const CustomerMenuContent = () => {
           clearTimeout(timeoutId);
         }
 
-        console.log('[Razorpay Flow] 4. API Returned:', payRes);
-
         if (!payRes || !payRes.success || !payRes.data) {
           throw new Error(payRes?.message || 'Failed to initialize payment gateway.');
         }
-
-        console.log('[Razorpay Flow] 5. Order Created:', payRes.data.razorpayOrderId);
 
         // Step 7: Reset processing state BEFORE opening modal so button never hangs
         setIsPlacingOrder(false);
@@ -453,7 +445,6 @@ const CustomerMenuContent = () => {
         await openRazorpayModal({
           orderData: payRes.data,
           onSuccess: async (verifyPayload) => {
-            console.log('[Razorpay Flow] 6. Payment Success, Verification Started with payload:', verifyPayload);
             setIsPlacingOrder(true);
             try {
               const vRes = await verifyPaymentApi({
@@ -461,10 +452,8 @@ const CustomerMenuContent = () => {
                 ...verifyPayload,
               });
 
-              console.log('[Razorpay Flow] 7. Verification Success:', vRes);
               if (vRes.success && (vRes.order || vRes.data?.order)) {
                 const confirmedOrder = vRes.order || vRes.data?.order;
-                console.log('[Razorpay Flow] 8. Order Created & Verified:', confirmedOrder._id);
                 clearCart();
                 setIsCartOpen(false);
                 setActiveOrder(confirmedOrder);
@@ -484,7 +473,6 @@ const CustomerMenuContent = () => {
             }
           },
           onDismiss: () => {
-            console.log('[Razorpay Flow] Modal Dismissed by user');
             setIsPlacingOrder(false);
             isSubmittingRef.current = false;
             setIsCartOpen(true);

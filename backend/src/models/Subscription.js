@@ -12,14 +12,25 @@ const subscriptionSchema = new mongoose.Schema(
     },
     plan: {
       type: String,
-      enum: Object.values(SUBSCRIPTION_PLANS),
-      default: SUBSCRIPTION_PLANS.STARTER,
+      default: 'Growth Pro',
+      index: true,
+    },
+    planId: {
+      type: String,
+      default: '',
+    },
+    razorpayCustomerId: {
+      type: String,
+      default: '',
+    },
+    razorpaySubscriptionId: {
+      type: String,
+      default: '',
       index: true,
     },
     status: {
       type: String,
-      enum: Object.values(SUBSCRIPTION_STATUS),
-      default: SUBSCRIPTION_STATUS.ACTIVE,
+      default: 'trial',
       index: true,
     },
     maxTables: {

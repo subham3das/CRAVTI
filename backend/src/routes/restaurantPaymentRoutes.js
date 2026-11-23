@@ -12,11 +12,12 @@ import {
 } from '../controllers/restaurantPaymentController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 
 const router = Router();
 
 // Require authenticated restaurant tenant for all routes
-router.use(protect, requireRestaurant);
+router.use(protect, requireRestaurant, verifySubscription);
 
 router.get('/summary', getRestaurantPaymentsSummary);
 router.get('/chart', getRestaurantRevenueChart);

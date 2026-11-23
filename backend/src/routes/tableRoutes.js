@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import {
   getTables,
   getTableStats,
@@ -16,7 +17,7 @@ import {
 } from '../controllers/tableController.js';
 
 const router = Router();
-router.use(protect, requireRestaurant);
+router.use(protect, requireRestaurant, verifySubscription);
 
 // Statistical & Bulk operations
 router.get('/stats', getTableStats);

@@ -10,12 +10,14 @@ import {
 } from '../controllers/manualOrderController.js';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 
 const router = Router();
 
 // Base middleware: All manual order routes require authentication, tenant isolation, and staff role authorization (owner, manager, cashier only; kitchen is blocked)
 router.use(protect);
 router.use(requireRestaurant);
+router.use(verifySubscription);
 router.use(authorizeRoles('owner', 'manager', 'cashier'));
 
 // Routes

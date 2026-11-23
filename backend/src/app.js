@@ -107,7 +107,7 @@ app.use(morgan(env.IS_PRODUCTION ? 'combined' : 'dev'));
 // Captures pristine unparsed Buffer stream for cryptographic HMAC SHA256 validation
 // =========================================================================
 app.use(
-  ['/api/payments/webhook', '/api/payment/webhook'],
+  ['/api/payments/webhook', '/api/payment/webhook', '/api/webhooks/razorpay'],
   express.raw({ type: '*/*', limit: '5mb' })
 );
 

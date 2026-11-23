@@ -41,6 +41,7 @@ export const env = Object.freeze({
   RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || '',
   RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET || '',
   RAZORPAY_MODE: process.env.RAZORPAY_MODE || 'test',
+  RAZORPAY_BASIC_PLAN_ID: process.env.RAZORPAY_BASIC_PLAN_ID || '',
 
   // Cloudinary
   CLOUDINARY_CLOUD_NAME: process.env.CLOUDINARY_CLOUD_NAME || '',

@@ -10,6 +10,8 @@ import {
   FiSettings,
   FiUserCheck,
   FiCreditCard,
+  FiDollarSign,
+  FiZap,
 } from 'react-icons/fi';
 import { MdQrCode2 } from 'react-icons/md';
 
@@ -37,9 +39,11 @@ export const NAV_ITEMS = [
     ],
   },
   { name: 'Payments', path: '/payments', icon: FiCreditCard },
+  { name: 'Finance', path: '/finance', icon: FiDollarSign },
   { name: 'Analytics', path: '/analytics', icon: FiBarChart2 },
   { name: 'Restaurant Profile', path: '/profile', icon: FiUserCheck },
   { name: 'Settings', path: '/settings', icon: FiSettings },
+  { name: 'Subscription', path: '/subscription', icon: FiZap },
 ];
 
 export const RESTAURANT_INFO = {

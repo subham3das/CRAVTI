@@ -5,6 +5,7 @@ import { getBusinessDashboard } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import env from '../config/env.js';
 
 const router = Router();
@@ -24,7 +25,7 @@ router.get('/', (req, res, next) => {
   }
   return protect(req, res, (err) => {
     if (err) return next(err);
-    requireRestaurant(req, res, () => getRestaurantDashboard(req, res, next));
+    requireRestaurant(req, res, () => verifySubscription(req, res, () => getRestaurantDashboard(req, res, next)));
   });
 });
 

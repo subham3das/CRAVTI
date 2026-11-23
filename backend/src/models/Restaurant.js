@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { calculateSubscriptionState } from '../utils/subscriptionUtils.js';
 
 const restaurantSchema = new mongoose.Schema(
   {
@@ -124,6 +125,105 @@ const restaurantSchema = new mongoose.Schema(
       ref: 'RestaurantUser',
       required: true,
     },
+    // SaaS Subscription Architecture (Phase 1)
+    subscription: {
+      planName: {
+        type: String,
+        default: 'Craviti Pro',
+      },
+      planId: {
+        type: String,
+        default: '',
+      },
+      razorpayCustomerId: {
+        type: String,
+        default: '',
+      },
+      razorpaySubscriptionId: {
+        type: String,
+        default: '',
+      },
+      status: {
+        type: String,
+        enum: ['trial', 'active', 'pending', 'expired', 'cancelled', 'halted', 'suspended'],
+        default: 'trial',
+        index: true,
+      },
+      trialStartDate: {
+        type: Date,
+      },
+      trialEndDate: {
+        type: Date,
+      },
+      trialEndsAt: {
+        type: Date,
+      },
+      subscriptionStart: {
+        type: Date,
+        default: Date.now,
+      },
+      subscriptionEnd: {
+        type: Date,
+        default: () => new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      },
+      nextBillingDate: {
+        type: Date,
+        default: null,
+      },
+      lastPaymentId: {
+        type: String,
+        default: '',
+      },
+    },
+    // Settlement & Commission Architecture
+    linkedAccountId: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    commissionRate: {
+      type: Number,
+      default: null, // null means inherits platform default commission
+    },
+    status: {
+      type: String,
+      default: 'active',
+    },
+    wallet: {
+      pendingBalance: {
+        type: Number,
+        default: 0,
+      },
+      paidBalance: {
+        type: Number,
+        default: 0,
+      },
+      lifetimeEarnings: {
+        type: Number,
+        default: 0,
+      },
+    },
+    pendingSettlement: {
+      type: Number,
+      default: 0,
+    },
+    totalSettled: {
+      type: Number,
+      default: 0,
+    },
+    settlementCycle: {
+      type: String,
+      enum: ['daily', 'weekly', 'biweekly', 'monthly'],
+      default: 'weekly',
+    },
+    minimumSettlement: {
+      type: Number,
+      default: 500,
+    },
+    settlementNotes: {
+      type: String,
+      default: '',
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -140,12 +240,60 @@ const restaurantSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        if (ret.subscription) {
+          ret.subscription = calculateSubscriptionState(ret.subscription, ret.createdAt);
+        }
+        return ret;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: (doc, ret) => {
+        if (ret.subscription) {
+          ret.subscription = calculateSubscriptionState(ret.subscription, ret.createdAt);
+        }
+        return ret;
+      },
+    },
   }
 );
+
+restaurantSchema.pre('save', function (next) {
+  if (this.isModified('subscription') || !this.subscription || !this.subscription.trialEndDate) {
+    if (!this.subscription) this.subscription = {};
+    const sub = this.subscription;
+    const start = sub.trialStartDate || sub.subscriptionStart || this.createdAt || new Date();
+    sub.trialStartDate = start;
+    if (!sub.trialEndDate) {
+      sub.trialEndDate = sub.trialEndsAt || new Date(new Date(start).getTime() + 14 * 24 * 60 * 60 * 1000);
+    }
+    sub.trialEndsAt = sub.trialEndDate;
+  }
+  next();
+});
+
+restaurantSchema.methods.getSubscriptionState = function () {
+  return calculateSubscriptionState(this.subscription, this.createdAt);
+};
+
+restaurantSchema.virtual('subscription.trialDaysRemaining').get(function () {
+  return calculateSubscriptionState(this.subscription, this.createdAt).trialDaysRemaining;
+});
+
+restaurantSchema.virtual('subscription.subscriptionStatus').get(function () {
+  return calculateSubscriptionState(this.subscription, this.createdAt).subscriptionStatus;
+});
 
 restaurantSchema.index({ slug: 1, isDeleted: 1 });
 restaurantSchema.index({ ownerPhone: 1, isDeleted: 1 });
 restaurantSchema.index({ createdBy: 1, isDeleted: 1 });
+restaurantSchema.index(
+  { linkedAccountId: 1 },
+  { unique: true, partialFilterExpression: { linkedAccountId: { $type: 'string', $gt: '' } } }
+);
 
 export const Restaurant = mongoose.model('Restaurant', restaurantSchema);
 

@@ -16,6 +16,7 @@ import { SOCKET_EVENTS } from '../constants/socketEvents.js';
 import { createRestaurantNotification, createAdminNotification } from './notificationService.js';
 import { getImageUrl } from '../utils/imageUtils.js';
 import { resolveRestaurantTable } from '../utils/tableUtils.js';
+import { recordOrderSettlement, handleSettlementRefundService } from './settlementService.js';
 
 /**
  * Constant helper for timing-safe string comparison
@@ -108,16 +109,8 @@ export const createPaymentOrderService = async ({
       throw error;
     }
 
-    // Resolve Table with temporary diagnostic logging
+    // Resolve Table
     const rawTable = tableId || tableNumber || tableIdentifier;
-
-    console.log('[Table Resolution Debug: Prepay Request]', {
-      restaurantId: restaurant._id,
-      tableId,
-      tableNumber,
-      tableIdentifier,
-      incomingPayload: { restaurantSlug, guestId, itemsCount: items?.length },
-    });
 
     if (!rawTable || String(rawTable).trim() === '' || String(rawTable).trim() === 'undefined' || String(rawTable).trim() === 'null') {
       const error = new Error('Invalid table information. Please scan QR code again.');
@@ -128,20 +121,6 @@ export const createPaymentOrderService = async ({
     table = (await resolveRestaurantTable(restaurant._id, rawTable)) ||
       (tableNumber ? await resolveRestaurantTable(restaurant._id, tableNumber) : null) ||
       (tableIdentifier ? await resolveRestaurantTable(restaurant._id, tableIdentifier) : null);
-
-    console.log('[Table Resolution Debug: Prepay Result]', {
-      restaurantId: restaurant._id,
-      rawTable,
-      databaseLookupResult: table
-        ? {
-            _id: table._id,
-            tableNumber: table.tableNumber,
-            tableName: table.tableName,
-            status: table.status,
-            isActive: table.isActive,
-          }
-        : null,
-    });
 
     if (!table) {
       const error = new Error('Invalid table information. Please scan QR code again.');
@@ -268,7 +247,6 @@ export const createPaymentOrderService = async ({
     throw error;
   }
 
-  console.log('[Razorpay Flow] Creating Razorpay Order with amount:', amountInPaise, 'currency: INR');
   const razorpay = getRazorpayInstance();
 
   // Call Razorpay API to create order
@@ -286,7 +264,6 @@ export const createPaymentOrderService = async ({
         tableNumber: String(order ? order.tableNumber : table?.tableNumber || ''),
       },
     });
-    console.log('[Razorpay Flow] Order Created Successfully:', rzpOrder.id);
   } catch (rzpErr) {
     console.error('[Razorpay Flow] Exception in razorpay.orders.create:', rzpErr);
     const error = new Error(rzpErr.error?.description || rzpErr.message || 'Razorpay order creation failed.');
@@ -465,6 +442,16 @@ export const createPrepaidOrderFromPayload = async (payment, razorpayPaymentId, 
     details: { orderId: order._id, orderNumber: order.orderNumber, razorpayOrderId: payment.razorpayOrderId },
   });
   await payment.save();
+
+  // 4.5. Record Settlement Ledger
+  recordOrderSettlement({
+    orderId: order._id,
+    orderNumber: order.orderNumber,
+    restaurantId: restaurant._id,
+    amount: order.grandTotal,
+    paymentMethod: 'online',
+    paymentId: payment._id,
+  }).catch((e) => console.warn('[Payment Service] Settlement ledger note:', e.message));
 
   // 5. Update Table to Occupied
   try {
@@ -835,6 +822,16 @@ export const refundPaymentService = async ({
     });
     await order.save();
   }
+
+  // Adjust settlement ledger and restaurant wallet
+  await handleSettlementRefundService({
+    paymentId: payment._id,
+    orderId: payment.orderId,
+    refundAmount,
+    refundId: rzpRefund.id,
+    reason,
+    admin: { name: actor, email: actor },
+  });
 
   emitSyncEvent({
     event: SOCKET_EVENTS.PAYMENT_REFUNDED,

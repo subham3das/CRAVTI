@@ -17,6 +17,8 @@ const RestaurantProfile = lazy(() =>
   import('../pages/RestaurantProfile').then((m) => ({ default: m.RestaurantProfile }))
 );
 const Settings = lazy(() => import('../pages/Settings').then((m) => ({ default: m.Settings })));
+const Subscription = lazy(() => import('../pages/Subscription').then((m) => ({ default: m.Subscription })));
+const Finance = lazy(() => import('../pages/Finance').then((m) => ({ default: m.Finance })));
 const Login = lazy(() => import('../pages/Login').then((m) => ({ default: m.Login })));
 const Signup = lazy(() => import('../pages/Signup').then((m) => ({ default: m.Signup })));
 const Onboarding = lazy(() => import('../pages/Onboarding').then((m) => ({ default: m.Onboarding })));
@@ -68,6 +70,8 @@ export const AppRoutes = () => {
           <Route path="analytics" element={<Analytics />} />
           <Route path="profile" element={<RestaurantProfile />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="finance" element={<Finance />} />
+          <Route path="subscription" element={<Subscription />} />
         </Route>
 
         {/* Fallback */}

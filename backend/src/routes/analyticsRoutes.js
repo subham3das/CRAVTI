@@ -8,6 +8,7 @@ import { getPlatformAnalytics } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { adminProtect } from '../middleware/adminAuthMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import env from '../config/env.js';
 
 const router = Router();
@@ -27,7 +28,7 @@ router.get('/', (req, res, next) => {
   }
   return protect(req, res, (err) => {
     if (err) return next(err);
-    requireRestaurant(req, res, () => getRestaurantAnalytics(req, res, next));
+    requireRestaurant(req, res, () => verifySubscription(req, res, () => getRestaurantAnalytics(req, res, next)));
   });
 });
 
@@ -36,7 +37,7 @@ router.get('/export', (req, res, next) => {
   if (req.method === 'OPTIONS') return next();
   return protect(req, res, (err) => {
     if (err) return next(err);
-    requireRestaurant(req, res, () => exportRestaurantAnalytics(req, res, next));
+    requireRestaurant(req, res, () => verifySubscription(req, res, () => exportRestaurantAnalytics(req, res, next)));
   });
 });
 

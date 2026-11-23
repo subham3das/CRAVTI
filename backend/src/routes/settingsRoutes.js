@@ -17,12 +17,13 @@ import {
 } from '../controllers/bankDetailsController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import { uploadBankDoc } from '../middleware/uploadMiddleware.js';
 
 const router = Router();
 
 // All settings routes are tenant-isolated and require authentication
-router.use(protect, requireRestaurant);
+router.use(protect, requireRestaurant, verifySubscription);
 
 router.get('/', getSettings);
 router.put('/', updateSettings);

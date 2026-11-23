@@ -20,6 +20,7 @@ import {
   FiDatabase,
   FiDownload,
   FiLayers,
+  FiRepeat,
 } from 'react-icons/fi';
 
 export const ADMIN_ROLES = {
@@ -86,8 +87,9 @@ export const PERMISSIONS = {
 };
 
 export const SUBSCRIPTION_PLANS = {
-  STARTER: 'starter',
+  PRO: 'pro',
   PROFESSIONAL: 'professional',
+  STARTER: 'starter',
   ENTERPRISE: 'enterprise',
 };
 
@@ -96,32 +98,42 @@ export const SUBSCRIPTION_STATUS = {
   SUSPENDED: 'suspended',
   EXPIRED: 'expired',
   TRIAL: 'trial',
+  CANCELLED: 'cancelled',
+  PENDING: 'pending',
 };
 
 export const PLAN_CONFIG = {
-  starter: {
-    name: 'Starter Plan',
-    badge: 'bg-slate-100 text-slate-700 border-slate-200',
-    maxTables: 5,
-    maxMenuItems: 30,
-    priceMonthly: 0,
-    commissionPercent: 5.0,
+  pro: {
+    name: 'Craviti Pro',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
   },
   professional: {
-    name: 'Professional Plan',
-    badge: 'bg-blue-50 text-blue-700 border-blue-200',
-    maxTables: 25,
-    maxMenuItems: 150,
-    priceMonthly: 699, // Launch Offer (Regular ₹1,500)
+    name: 'Craviti Pro',
+    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
+  },
+  starter: {
+    name: 'Craviti Pro',
+    badge: 'bg-slate-100 text-slate-700 border-slate-200',
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
     commissionPercent: 2.5,
   },
   enterprise: {
-    name: 'Enterprise Plan',
+    name: 'Craviti Pro',
     badge: 'bg-purple-50 text-purple-700 border-purple-200',
-    maxTables: 100,
-    maxMenuItems: 1000,
-    priceMonthly: 3999,
-    commissionPercent: 1.0,
+    maxTables: 9999,
+    maxMenuItems: 9999,
+    priceMonthly: 699,
+    commissionPercent: 2.5,
   },
 };
 
@@ -132,6 +144,8 @@ export const SIDEBAR_NAV_ITEMS = [
   { path: '/restaurants', label: 'Restaurants', icon: FiBox },
   { path: '/verification', label: 'Verification', icon: FiCheckCircle },
   { path: '/subscriptions', label: 'Subscriptions', icon: FiLayers },
+  { path: '/settlements', label: 'Settlements', icon: FiRepeat },
+  { path: '/finance', label: 'Finance', icon: FiDollarSign },
   { path: '/billing', label: 'Billing Center', icon: FiFileText },
   { path: '/orders', label: 'Live Orders', icon: FiShoppingBag },
   { path: '/analytics', label: 'Analytics', icon: FiTrendingUp },

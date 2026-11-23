@@ -9,6 +9,7 @@ import { generateReceiptSnapshot } from './orderService.js';
 import { emitSyncEvent, emitToOrder } from '../config/socket.js';
 import SOCKET_EVENTS from '../constants/socketEvents.js';
 import env from '../config/env.js';
+import { recordOrderSettlement, handleSettlementRefundService } from './settlementService.js';
 
 /**
  * Secure timing-safe cryptographic comparison
@@ -77,11 +78,11 @@ const notifyRestaurant = async ({ restaurantId, type, title, message, link = '/o
 /**
  * Core Production Razorpay Webhook Processor
  */
-export const processRazorpayWebhook = async ({ rawBody, signature, headers = {}, startTime = Date.now() }) => {
+export const processRazorpayWebhook = async ({ rawBody, signature, headers = {}, startTime = Date.now(), secret }) => {
   // 1. Signature Verification
   let isValid = false;
   try {
-    isValid = verifyRazorpayWebhookSignature({ rawBody, signature });
+    isValid = verifyRazorpayWebhookSignature({ rawBody, signature, secret });
     console.log('[Razorpay Webhook] Verification result: VALID');
   } catch (sigErr) {
     console.warn(`[Razorpay Webhook] Verification result: INVALID (${sigErr.message})`);
@@ -435,6 +436,21 @@ export const processRazorpayWebhook = async ({ rawBody, signature, headers = {},
         }
 
         await payment.save();
+
+        // 7. Idempotent Settlement Record Creation and Wallet Update
+        try {
+          await recordOrderSettlement({
+            orderId: order?._id || validOrderId,
+            orderNumber: order?.orderNumber || orderId,
+            restaurantId: validRestaurantId || order?.restaurantId,
+            amount: amountRupees || order?.grandTotal,
+            paymentMethod: method,
+            paymentId: payment._id,
+          });
+        } catch (settleErr) {
+          console.warn(`[Razorpay Webhook] Settlement ledger notice: ${settleErr.message}`);
+        }
+
         processingResult = `Payment ${rzpPaymentId} captured for Order ${order?.orderNumber || orderId || 'N/A'}`;
         break;
       }
@@ -586,9 +602,43 @@ export const processRazorpayWebhook = async ({ rawBody, signature, headers = {},
               });
             }
           }
+
+          // Adjust Settlement Ledger and Restaurant Wallet
+          try {
+            await handleSettlementRefundService({
+              paymentId: payment._id,
+              orderId: payment.orderId,
+              refundAmount,
+              refundId,
+              reason: refundReason,
+              admin: { name: 'razorpay_webhook', email: 'razorpay_webhook' },
+            });
+          } catch (refundErr) {
+            console.warn(`[Razorpay Webhook] Settlement refund adjustment notice: ${refundErr.message}`);
+          }
         }
 
         processingResult = `Refund ${refundId} of INR ${refundAmount} recorded.`;
+        break;
+      }
+
+      // ==========================================
+      // EVENTS: subscription.*
+      // ==========================================
+      case 'subscription.activated':
+      case 'subscription.charged':
+      case 'subscription.pending':
+      case 'subscription.halted':
+      case 'subscription.cancelled':
+      case 'subscription.resumed': {
+        try {
+          const { handleSubscriptionWebhookService } = await import('./subscriptionService.js');
+          await handleSubscriptionWebhookService(event, payload);
+          processingResult = `Subscription event "${event}" processed successfully.`;
+        } catch (subErr) {
+          console.error(`[Razorpay Webhook] Subscription processing error: ${subErr.message}`);
+          processingResult = `Subscription event error: ${subErr.message}`;
+        }
         break;
       }
 

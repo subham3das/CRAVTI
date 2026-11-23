@@ -152,6 +152,19 @@ export const fetchPlatformInvoicesApi = (params = {}) =>
 export const generatePlatformInvoiceApi = (restaurantId, data) =>
   api.post(`/admin/billing/invoices/${restaurantId}`, data).then((res) => res.data);
 
+// 4.5. Settlements Management (Admin)
+export const fetchAdminSettlementsApi = (params = {}) =>
+  api.get('/admin/settlements', { params }).then((res) => res.data);
+
+export const fetchAdminRestaurantWalletsApi = (params = {}) =>
+  api.get('/admin/settlements/wallets', { params }).then((res) => res.data);
+
+export const processAdminSettlementApi = (data = {}) =>
+  api.post('/admin/settlements/process', data).then((res) => res.data);
+
+export const updateAdminRestaurantCommissionApi = (data = {}) =>
+  api.patch('/admin/settlements/commission', data).then((res) => res.data);
+
 // 5. Support Tickets
 export const fetchSupportTicketsApi = (params = {}) =>
   api.get('/admin/support/tickets', { params }).then((res) => res.data);
@@ -211,3 +224,73 @@ export const fetchActivityFeedApi = () =>
 // 15. Comprehensive Platform Analytics
 export const fetchComprehensivePlatformAnalyticsApi = () =>
   api.get('/admin/platform-analytics').then((res) => res.data);
+
+// ==========================================
+// 16. Finance & Settlement Enterprise Module
+// ==========================================
+export const fetchFinanceOverviewApi = () =>
+  api.get('/admin/finance/overview').then((res) => res.data);
+
+export const fetchFinanceWalletsApi = (params = {}) =>
+  api.get('/admin/finance/wallets', { params }).then((res) => res.data);
+
+export const fetchWalletLedgerApi = (restaurantId, params = {}) =>
+  api.get(`/admin/finance/wallets/${restaurantId}/ledger`, { params }).then((res) => res.data);
+
+export const adjustWalletBalanceApi = (data) =>
+  api.post('/admin/finance/wallets/adjust', data).then((res) => res.data);
+
+export const fetchFinanceSettlementsApi = (params = {}) =>
+  api.get('/admin/finance/settlements', { params }).then((res) => res.data);
+
+export const updateSettlementStatusApi = (settlementId, data) =>
+  api.patch(`/admin/finance/settlements/${settlementId}/status`, data).then((res) => res.data);
+
+export const batchProcessSettlementsApi = (data) =>
+  api.post('/admin/finance/settlements/batch-process', data).then((res) => res.data);
+
+export const fetchFinanceSubscriptionsApi = (params = {}) =>
+  api.get('/admin/finance/subscriptions', { params }).then((res) => res.data);
+
+export const pauseSubscriptionApi = (data) =>
+  api.post('/admin/finance/subscriptions/pause', data).then((res) => res.data);
+
+export const resumeSubscriptionApi = (data) =>
+  api.post('/admin/finance/subscriptions/resume', data).then((res) => res.data);
+
+export const renewSubscriptionApi = (data) =>
+  api.post('/admin/finance/subscriptions/renew', data).then((res) => res.data);
+
+export const cancelFinanceSubscriptionApi = (data) =>
+  api.post('/admin/finance/subscriptions/cancel', data).then((res) => res.data);
+
+export const fetchSubscriptionHistoryApi = (params = {}) =>
+  api.get('/admin/finance/subscriptions/history', { params }).then((res) => res.data);
+
+export const fetchCommissionRulesApi = (params = {}) =>
+  api.get('/admin/finance/commission-rules', { params }).then((res) => res.data);
+
+export const updateCommissionRuleApi = (data) =>
+  api.put('/admin/finance/commission-rules', data).then((res) => res.data);
+
+export const fetchCommissionHistoryApi = (params = {}) =>
+  api.get('/admin/finance/commission-history', { params }).then((res) => res.data);
+
+export const fetchRouteAccountsApi = (params = {}) =>
+  api.get('/admin/finance/route-accounts', { params }).then((res) => res.data);
+
+export const reconnectRouteAccountApi = (data) =>
+  api.post('/admin/finance/route-accounts/reconnect', data).then((res) => res.data);
+
+export const fetchFinanceReportsApi = (params = {}) =>
+  api.get('/admin/finance/reports', { params }).then((res) => res.data);
+
+export const fetchFinanceAuditLogsApi = (params = {}) =>
+  api.get('/admin/finance/audit-logs', { params }).then((res) => res.data);
+
+export const fetchFinanceSettingsApi = () =>
+  api.get('/admin/finance/settings').then((res) => res.data);
+
+export const updateFinanceSettingsApi = (data) =>
+  api.put('/admin/finance/settings', data).then((res) => res.data);
+

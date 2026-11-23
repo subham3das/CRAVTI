@@ -138,6 +138,30 @@ export const updateProfileService = async (userId, updatePayload, coverFile) => 
     }
   }
 
+  // Linked Razorpay Route Account ID
+  if (updatePayload.linkedAccountId !== undefined || updatePayload.bankDetails?.linkedAccountId !== undefined) {
+    const rawId = updatePayload.linkedAccountId !== undefined ? updatePayload.linkedAccountId : updatePayload.bankDetails?.linkedAccountId;
+    const trimmedId = String(rawId || '').trim();
+    if (trimmedId) {
+      if (!/^acc_[a-zA-Z0-9_-]+$/.test(trimmedId)) {
+        const err = new Error("Invalid Route Account ID format. Must begin with 'acc_' followed by alphanumeric characters.");
+        err.statusCode = 400;
+        throw err;
+      }
+      const duplicate = await Restaurant.findOne({
+        _id: { $ne: restaurant._id },
+        linkedAccountId: trimmedId,
+        isDeleted: { $ne: true },
+      });
+      if (duplicate) {
+        const err = new Error('This Razorpay Route Account ID is already linked to another restaurant.');
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+    restaurant.linkedAccountId = trimmedId;
+  }
+
   restaurant.profileCompletionPercentage = calculateProfileCompletion(restaurant);
   await restaurant.save();
 

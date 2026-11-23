@@ -9,12 +9,13 @@ import {
 } from '../controllers/categoryController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { requireRestaurant } from '../middleware/tenantMiddleware.js';
+import { verifySubscription } from '../middleware/subscriptionMiddleware.js';
 import { validateRequest } from '../middleware/validatorMiddleware.js';
 
 const router = Router();
 
 // Protect all category routes and resolve tenant restaurantId
-router.use(protect, requireRestaurant);
+router.use(protect, requireRestaurant, verifySubscription);
 
 router.get('/', getCategories);
 
