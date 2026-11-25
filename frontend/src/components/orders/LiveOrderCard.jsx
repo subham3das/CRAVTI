@@ -18,6 +18,7 @@ export const LiveOrderCard = React.memo(({
   onStatusChange,
   onPaymentChange,
   onSelectOrder,
+  onServiceAction,
   isNew = false,
 }) => {
   if (!order) return null;
@@ -27,6 +28,9 @@ export const LiveOrderCard = React.memo(({
     order.paymentStatus === 'pending' ||
     (order.paymentMethod === 'cash' && order.paymentStatus !== 'paid_cash');
   const items = Array.isArray(order.items) ? order.items : [];
+  const pendingServices = Array.isArray(order.serviceRequests)
+    ? order.serviceRequests.filter((r) => r.status === 'pending')
+    : [];
 
   return (
     <motion.div
@@ -68,6 +72,87 @@ export const LiveOrderCard = React.memo(({
           <StatusBadge status={order.status} size="sm" />
         </div>
       </div>
+
+      {/* Pending Table Service Badges (Waiter Call / Water Request) */}
+      {pendingServices.length > 0 && (
+        <div
+          className="p-2.5 bg-amber-50/80 border-b border-amber-200/60 space-y-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {pendingServices.map((req) => (
+            <div
+              key={req.requestId || req._id}
+              className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-white border border-amber-200 shadow-2xs gap-1.5"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-sm shrink-0">{req.type === 'waiter' ? '🔔' : '💧'}</span>
+                <div className="truncate">
+                  <div className="font-extrabold text-amber-950 flex items-center gap-1">
+                    <span>{req.type === 'waiter' ? 'Waiter Calling' : 'Water Requested'}</span>
+                    {req.type === 'water' && (
+                      <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded font-bold">
+                        Qty: {req.quantity || 1}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {req.type === 'waiter'
+                      ? 'Customer requested assistance'
+                      : `${req.productName || 'Water'}${req.price > 0 ? ` • ₹${req.price * (req.quantity || 1)}` : ' • Free'}`}
+                  </p>
+                </div>
+              </div>
+
+              {onServiceAction && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {req.type === 'waiter' ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onServiceAction(order._id, req.requestId || req._id, 'handled')
+                      }
+                      className="px-2.5 py-1 rounded-md text-[11px] font-extrabold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                    >
+                      Handled
+                    </button>
+                  ) : (
+                    <>
+                      {!req.addedToBill ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onServiceAction(order._id, req.requestId || req._id, 'add_to_bill')
+                            }
+                            className="px-2.5 py-1 rounded-md text-[11px] font-extrabold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                            title="Add water bottle to bill"
+                          >
+                            Add To Bill
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onServiceAction(order._id, req.requestId || req._id, 'dismiss')
+                            }
+                            className="px-2 py-1 rounded-md text-[11px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                            title="Dismiss water request"
+                          >
+                            Dismiss
+                          </button>
+                        </>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200">
+                          ✓ Added to Bill
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Middle: Dish List & Special Notes */}
       <div className="p-3.5 space-y-2 flex-1">

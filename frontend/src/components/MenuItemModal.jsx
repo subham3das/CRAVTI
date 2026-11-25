@@ -40,6 +40,7 @@ export const MenuItemModal = ({
       preparationTime: 15,
       popular: false,
       recommended: false,
+      isWaterItem: false,
       displayOrder: 0,
     },
   });
@@ -65,6 +66,7 @@ export const MenuItemModal = ({
         preparationTime: editingItem.preparationTime || 15,
         popular: editingItem.popular || false,
         recommended: editingItem.recommended || false,
+        isWaterItem: editingItem.isWaterItem || false,
         displayOrder: editingItem.displayOrder || 0,
       });
       setImagePreview(getImageUrl(editingItem.image) || null);
@@ -82,6 +84,7 @@ export const MenuItemModal = ({
         preparationTime: 15,
         popular: false,
         recommended: false,
+        isWaterItem: false,
         displayOrder: 0,
       });
       setImagePreview(null);
@@ -141,6 +144,7 @@ export const MenuItemModal = ({
     formData.append('preparationTime', data.preparationTime || 15);
     formData.append('popular', data.popular ? 'true' : 'false');
     formData.append('recommended', data.recommended ? 'true' : 'false');
+    formData.append('isWaterItem', data.isWaterItem ? 'true' : 'false');
     formData.append('displayOrder', data.displayOrder || 0);
 
     if (imageFile) {
@@ -344,6 +348,26 @@ export const MenuItemModal = ({
             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-800">
               <FiThumbsUp className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               <span>Chef Recommended</span>
+            </div>
+          </label>
+        </div>
+
+        {/* Water Item Configuration */}
+        <div className="pt-1">
+          <label className="flex items-start gap-3 p-3.5 rounded-xl border border-blue-200 bg-blue-50/40 hover:bg-blue-50/70 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+              {...register('isWaterItem')}
+            />
+            <div className="flex-1 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                <span className="text-blue-600 text-sm">💧</span>
+                <span>Water Item (Use this item as Water Bottle)</span>
+              </div>
+              <p className="text-slate-600 text-[11px] mt-1 leading-relaxed">
+                When selected, customer &ldquo;Request Water&rdquo; will automatically use this menu item and its configured price. Only one item can be marked as the Water Item per restaurant.
+              </p>
             </div>
           </label>
         </div>

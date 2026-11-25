@@ -18,6 +18,7 @@ import {
   fetchHistoricalOrdersApi,
   updateOrderStatusApi,
   updateOrderPaymentStatusApi,
+  handleServiceRequestApi,
   fetchManualOrdersApi,
   markManualOrderPaidApi,
   cancelManualOrderApi,
@@ -289,6 +290,39 @@ export const Orders = () => {
     socket.on('status-updated', handleOrderUpdate);
     socket.on('payment-updated', handleOrderUpdate);
 
+    // Table Service Requests (Waiter Call / Water Request)
+    const handleServiceUpdate = (payload) => {
+      if (!payload) return;
+      if (payload.order) {
+        handleOrderUpdate(payload.order);
+      } else if (payload.orderId && payload.serviceRequests) {
+        setLiveOrders((prev) =>
+          prev.map((o) =>
+            o._id === payload.orderId
+              ? { ...o, serviceRequests: payload.serviceRequests }
+              : o
+          )
+        );
+        setSelectedOrder((prev) =>
+          prev && prev._id === payload.orderId
+            ? { ...prev, serviceRequests: payload.serviceRequests }
+            : prev
+        );
+      }
+    };
+
+    const handleServiceCustomEvent = (e) => {
+      if (e?.detail) {
+        handleServiceUpdate(e.detail);
+      }
+    };
+
+    window.addEventListener('craviti:service-requested', handleServiceCustomEvent);
+    socket.on('waiter.requested', handleServiceUpdate);
+    socket.on('water.requested', handleServiceUpdate);
+    socket.on('waiter.handled', handleServiceUpdate);
+    socket.on('water.served', handleServiceUpdate);
+
     // Manual Order real-time events
     const handleManualOrderUpdate = () => {
       if (activeMainTab === 'manual') {
@@ -300,6 +334,11 @@ export const Orders = () => {
 
     return () => {
       window.removeEventListener('craviti:new-order-received', handleCustomEvent);
+      window.removeEventListener('craviti:service-requested', handleServiceCustomEvent);
+      socket.off('waiter.requested', handleServiceUpdate);
+      socket.off('water.requested', handleServiceUpdate);
+      socket.off('waiter.handled', handleServiceUpdate);
+      socket.off('water.served', handleServiceUpdate);
       socket.disconnect();
     };
   }, [restaurant?._id, soundEnabled, activeMainTab, loadManualOrders]);
@@ -351,6 +390,24 @@ export const Orders = () => {
       }
     } catch {
       toast.error('Failed to update payment');
+    }
+  };
+
+  // QR Order Action: Handle Table Service (Waiter Called / Water Requested)
+  const handleServiceAction = async (orderId, requestId, action) => {
+    try {
+      const res = await handleServiceRequestApi(orderId, requestId, action);
+      if (res.success && res.order) {
+        setLiveOrders((prev) =>
+          prev.map((o) => (o._id === orderId ? { ...o, ...res.order } : o))
+        );
+        setSelectedOrder((prev) =>
+          prev && prev._id === orderId ? { ...prev, ...res.order } : prev
+        );
+        toast.success(res.message || 'Service request processed');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to update service request');
     }
   };
 
@@ -1171,6 +1228,7 @@ export const Orders = () => {
                     onStatusChange={handleStatusChange}
                     onPaymentChange={handlePaymentChange}
                     onSelectOrder={setSelectedOrder}
+                    onServiceAction={handleServiceAction}
                   />
                 ))}
               </AnimatePresence>
@@ -1204,6 +1262,7 @@ export const Orders = () => {
         onClose={() => setSelectedOrder(null)}
         onStatusChange={handleStatusChange}
         onPaymentChange={handlePaymentChange}
+        onServiceAction={handleServiceAction}
         restaurantName={restaurant?.restaurantName}
       />
 

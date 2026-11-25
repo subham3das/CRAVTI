@@ -25,6 +25,12 @@ export const SOCKET_EVENTS = {
   ORDER_PAID: 'order.paid',
   RECEIPT_GENERATED: 'receipt.generated',
 
+  // Table Service (Waiter & Water)
+  WAITER_REQUESTED: 'waiter.requested',
+  WAITER_HANDLED: 'waiter.handled',
+  WATER_REQUESTED: 'water.requested',
+  WATER_SERVED: 'water.served',
+
   // Payments (Phase 5)
   PAYMENT_CREATED: 'payment.created',
   PAYMENT_SUCCESS: 'payment.success',

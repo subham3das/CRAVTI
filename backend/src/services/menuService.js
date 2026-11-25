@@ -102,6 +102,16 @@ export const createMenuItemService = async (restaurantId, data, imageFile) => {
     imageData = normalizeImage(data.image);
   }
 
+  const isWaterItem = data.isWaterItem === 'true' || data.isWaterItem === true;
+  if (isWaterItem) {
+    // Only ONE menu item can be marked as Water Item per restaurant.
+    // Automatically remove the flag from any existing water item.
+    await MenuItem.updateMany(
+      { restaurantId, isWaterItem: true },
+      { $set: { isWaterItem: false } }
+    );
+  }
+
   const item = await MenuItem.create({
     restaurantId,
     categoryId: data.categoryId,
@@ -117,6 +127,7 @@ export const createMenuItemService = async (restaurantId, data, imageFile) => {
     preparationTime: Number(data.preparationTime) || 15,
     popular: data.popular === 'true' || data.popular === true,
     recommended: data.recommended === 'true' || data.recommended === true,
+    isWaterItem,
     displayOrder: Number(data.displayOrder) || 0,
   });
 
@@ -159,6 +170,19 @@ export const updateMenuItemService = async (restaurantId, itemId, data, imageFil
   if (data.preparationTime !== undefined) item.preparationTime = Number(data.preparationTime);
   if (data.popular !== undefined) item.popular = data.popular === 'true' || data.popular === true;
   if (data.recommended !== undefined) item.recommended = data.recommended === 'true' || data.recommended === true;
+  if (data.isWaterItem !== undefined) {
+    const isWater = data.isWaterItem === 'true' || data.isWaterItem === true;
+    if (isWater) {
+      // Enforce single water item: clear any previous item for this restaurant
+      await MenuItem.updateMany(
+        { restaurantId, _id: { $ne: item._id }, isWaterItem: true },
+        { $set: { isWaterItem: false } }
+      );
+      item.isWaterItem = true;
+    } else {
+      item.isWaterItem = false;
+    }
+  }
   if (data.displayOrder !== undefined) item.displayOrder = Number(data.displayOrder);
 
   // Handle image replacement with Cloudinary asset cleanup (Standard 21)
@@ -217,6 +241,7 @@ export const duplicateMenuItemService = async (restaurantId, itemId) => {
     preparationTime: item.preparationTime,
     popular: false,
     recommended: false,
+    isWaterItem: false,
     displayOrder: (item.displayOrder || 0) + 1,
   });
 

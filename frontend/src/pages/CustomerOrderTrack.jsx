@@ -12,13 +12,24 @@ import {
   FiCreditCard,
 } from 'react-icons/fi';
 import { MdDoneAll, MdOutlineDinnerDining } from 'react-icons/md';
-import { fetchCustomerOrderTrackApi, fetchOrderReceiptApi } from '../services/orderService';
+import {
+  fetchCustomerOrderTrackApi,
+  fetchOrderReceiptApi,
+  callWaiterApi,
+  requestWaterApi,
+  fetchWaterOptionsApi,
+} from '../services/orderService';
 import { createPaymentOrderApi, verifyPaymentApi } from '../services/paymentService';
 import { openRazorpayModal } from '../utils/razorpay';
 import { generateReceiptPdf, RECEIPT_TEMPLATES } from '../utils/receiptGenerator';
+import {
+  CallWaiterModal,
+  RequestWaterModal,
+} from '../components/customer/TableServiceModals';
 import { CustomerVegBadge } from '../components/customer/CustomerVegBadge';
 import { CustomerFooter } from '../components/customer/CustomerFooter';
 import { formatCurrency } from '../utils/formatters';
+import { getTableSession, saveTableSession, saveActiveOrderSession } from '../utils/guestSession';
 import toast from 'react-hot-toast';
 import env from '../config/env.js';
 
@@ -41,6 +52,107 @@ export const CustomerOrderTrack = () => {
   const [error, setError] = useState(null);
   const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Table Service states
+  const [isCallWaiterOpen, setIsCallWaiterOpen] = useState(false);
+  const [isRequestWaterOpen, setIsRequestWaterOpen] = useState(false);
+  const [waterOptions, setWaterOptions] = useState([]);
+  const [waiterCooldown, setWaiterCooldown] = useState(0);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  const [isRequestingWater, setIsRequestingWater] = useState(false);
+
+  // Waiter Cooldown Timer (30s)
+  useEffect(() => {
+    if (waiterCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setWaiterCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [waiterCooldown]);
+
+  const getEffectiveSlug = () => {
+    return (typeof order?.restaurantId === 'object' ? order?.restaurantId?.slug : order?.restaurantSlug) || getTableSession()?.restaurantSlug || '';
+  };
+
+  const handleOpenWaterModal = async () => {
+    setIsRequestWaterOpen(true);
+    const slug = getEffectiveSlug();
+    if (slug) {
+      try {
+        const res = await fetchWaterOptionsApi(slug);
+        if (res.success && res.data) {
+          setWaterOptions(res.data);
+        }
+      } catch (e) {
+        console.warn('Failed to load water options:', e);
+      }
+    }
+  };
+
+  const handleCallWaiterConfirm = async () => {
+    if (isCallingWaiter || waiterCooldown > 0 || !order?._id) return;
+    try {
+      setIsCallingWaiter(true);
+      const slug = getEffectiveSlug();
+      const res = await callWaiterApi({
+        orderId: order._id,
+        restaurantSlug: slug,
+        tableIdentifier: order.tableNumber,
+        customerName: order.customerName || 'Guest',
+      });
+      if (res.success) {
+        toast.success(res.message || 'Waiter has been notified.');
+        setWaiterCooldown(30);
+        setIsCallWaiterOpen(false);
+      } else {
+        toast.error(res.message || 'Failed to call waiter');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to call waiter');
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+
+  const handleWaterSubmit = async ({ productName, quantity, price }) => {
+    if (isRequestingWater || !order?._id) return;
+    try {
+      setIsRequestingWater(true);
+      const slug = getEffectiveSlug();
+      const res = await requestWaterApi({
+        orderId: order._id,
+        restaurantSlug: slug,
+        tableIdentifier: order.tableNumber,
+        productName,
+        quantity,
+        price,
+        customerName: order.customerName || 'Guest',
+      });
+      if (res.success) {
+        toast.success(res.message || 'Water request sent!');
+        if (res.order) {
+          setOrder(res.order);
+        }
+        setIsRequestWaterOpen(false);
+      } else {
+        toast.error(res.message || 'Failed to request water');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to request water');
+    } finally {
+      setIsRequestingWater(false);
+    }
+  };
+
+  const handleAddMoreItems = () => {
+    let slug = getEffectiveSlug();
+    const tableNum = order?.tableNumber || getTableSession()?.tableNumber || '1';
+    if (slug) {
+      navigate(`/order/${slug}/${tableNum}?mode=add_more`);
+    } else {
+      navigate(-1);
+    }
+  };
 
   // Online Payment Flow via Razorpay
   const handlePayOnline = async () => {
@@ -119,6 +231,15 @@ export const CustomerOrderTrack = () => {
         const res = await fetchCustomerOrderTrackApi(orderId);
         if (isMounted && res.success && res.order) {
           setOrder(res.order);
+          saveActiveOrderSession(res.order);
+          if (res.order.restaurantId && typeof res.order.restaurantId === 'object' && res.order.restaurantId.slug) {
+            saveTableSession({
+              restaurantId: res.order.restaurantId._id,
+              restaurantSlug: res.order.restaurantId.slug,
+              tableId: res.order.tableId?._id || res.order.tableId,
+              tableNumber: res.order.tableNumber,
+            });
+          }
         }
       } catch (err) {
         if (isMounted) setError(err.response?.data?.message || 'Order not found');
@@ -152,13 +273,31 @@ export const CustomerOrderTrack = () => {
 
     const handleUpdate = (updatedOrder) => {
       if (updatedOrder) {
-        setOrder((prev) => (prev ? { ...prev, ...updatedOrder } : updatedOrder));
+        setOrder((prev) => {
+          if (!prev) return updatedOrder;
+          const preservedRestaurant = typeof prev.restaurantId === 'object' && prev.restaurantId?.slug
+            ? prev.restaurantId
+            : updatedOrder.restaurantId;
+          return {
+            ...prev,
+            ...updatedOrder,
+            restaurantId: typeof updatedOrder.restaurantId === 'object' && updatedOrder.restaurantId?.slug
+              ? updatedOrder.restaurantId
+              : preservedRestaurant,
+          };
+        });
       }
     };
 
     socket.on('order-updated', handleUpdate);
     socket.on('status-updated', handleUpdate);
     socket.on('payment-updated', handleUpdate);
+    socket.on('waiter.handled', (data) => {
+      if (data?.order) setOrder((prev) => ({ ...prev, ...data.order }));
+    });
+    socket.on('water.served', (data) => {
+      if (data?.order) setOrder((prev) => ({ ...prev, ...data.order }));
+    });
     socket.on('order:status_updated', (data) => {
       if (data?.status) {
         setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
@@ -264,6 +403,45 @@ export const CustomerOrderTrack = () => {
             </div>
           )}
         </div>
+
+        {/* Quick Table Service Action Buttons */}
+        {!isCancelled && order.status !== 'completed' && (
+          <div className="grid grid-cols-3 gap-2 bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setIsCallWaiterOpen(true)}
+              disabled={waiterCooldown > 0}
+              className={`py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-center ${
+                waiterCooldown > 0
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 active:scale-95 cursor-pointer'
+              }`}
+            >
+              <span className="text-xl">🔔</span>
+              <span className="text-[11px] font-extrabold leading-tight">
+                {waiterCooldown > 0 ? `${waiterCooldown}s` : 'Call Waiter'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOpenWaterModal}
+              className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200/80 active:scale-95 transition-all cursor-pointer text-center"
+            >
+              <span className="text-xl">💧</span>
+              <span className="text-[11px] font-extrabold leading-tight">Request Water</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleAddMoreItems}
+              className="py-3 px-2 rounded-xl flex flex-col items-center justify-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200/80 active:scale-95 transition-all cursor-pointer text-center"
+            >
+              <span className="text-xl">➕</span>
+              <span className="text-[11px] font-extrabold leading-tight">Add More</span>
+            </button>
+          </div>
+        )}
 
         {/* Simplified Live Timeline: Placed -> Accepted -> Served -> Completed */}
         {!isCancelled && (
@@ -452,6 +630,27 @@ export const CustomerOrderTrack = () => {
         {/* Craviti Customer Ordering Footer */}
         <CustomerFooter className="mt-8 rounded-2xl" />
       </div>
+
+      {/* Table Service Modals */}
+      <CallWaiterModal
+        isOpen={isCallWaiterOpen}
+        onClose={() => setIsCallWaiterOpen(false)}
+        onConfirm={handleCallWaiterConfirm}
+        cooldown={waiterCooldown}
+        isLoading={isCallingWaiter}
+        tableNumber={order?.tableNumber}
+      />
+
+      <RequestWaterModal
+        isOpen={isRequestWaterOpen}
+        onClose={() => setIsRequestWaterOpen(false)}
+        onSubmit={handleWaterSubmit}
+        onSubmitWater={handleWaterSubmit}
+        options={waterOptions}
+        waterOptions={waterOptions}
+        isLoading={isRequestingWater}
+        tableNumber={order?.tableNumber}
+      />
     </div>
   );
 };

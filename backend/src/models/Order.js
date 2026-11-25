@@ -5,7 +5,7 @@ const orderItemSchema = new mongoose.Schema(
     itemId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'MenuItem',
-      required: true,
+      default: () => new mongoose.Types.ObjectId(),
     },
     menuItemId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -81,6 +81,62 @@ const statusHistorySchema = new mongoose.Schema(
     },
   },
   { _id: false }
+);
+
+const serviceRequestSchema = new mongoose.Schema(
+  {
+    requestId: {
+      type: String,
+      default: () => 'srv_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+    },
+    type: {
+      type: String,
+      enum: ['waiter', 'water', 'custom'],
+      required: true,
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'handled', 'served', 'cancelled'],
+      default: 'pending',
+    },
+    productName: {
+      type: String,
+      default: '',
+    },
+    quantity: {
+      type: Number,
+      default: 1,
+    },
+    price: {
+      type: Number,
+      default: 0,
+    },
+    addedToBill: {
+      type: Boolean,
+      default: false,
+    },
+    requestedByGuest: {
+      type: Boolean,
+      default: true,
+    },
+    requestedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    handledAt: {
+      type: Date,
+      default: null,
+    },
+    handledBy: {
+      type: String,
+      default: '',
+    },
+    notes: {
+      type: String,
+      default: '',
+    },
+  },
+  { _id: true }
 );
 
 const orderSchema = new mongoose.Schema(
@@ -269,6 +325,10 @@ const orderSchema = new mongoose.Schema(
     updatedBy: {
       type: String,
       default: 'customer',
+    },
+    serviceRequests: {
+      type: [serviceRequestSchema],
+      default: [],
     },
     isDeleted: {
       type: Boolean,

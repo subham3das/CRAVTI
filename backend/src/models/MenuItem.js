@@ -84,6 +84,11 @@ const menuItemSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isWaterItem: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     displayOrder: {
       type: Number,
       default: 0,
@@ -110,6 +115,7 @@ const menuItemSchema = new mongoose.Schema(
 menuItemSchema.index({ restaurantId: 1, itemName: 1 });
 menuItemSchema.index({ restaurantId: 1, categoryId: 1, isDeleted: 1 });
 menuItemSchema.index({ restaurantId: 1, availability: 1, isDeleted: 1 });
+menuItemSchema.index({ restaurantId: 1, isWaterItem: 1, isDeleted: 1 });
 menuItemSchema.index({ restaurantId: 1, isDeleted: 1, createdAt: -1 });
 
 // Migration layer: ensure legacy docs with string image convert to { url, public_id } seamlessly

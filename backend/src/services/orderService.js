@@ -495,18 +495,34 @@ export const placeOrderService = async (payload) => {
   }
 
   // Check One Active Bill Per Table
-  const existingActiveTableOrder = await Order.findOne({
-    restaurantId: restaurant._id,
-    tableId: table._id,
-    status: { $in: ['placed', 'accepted', 'served'] },
-    isDeleted: false,
-  });
+  let existingActiveTableOrder = null;
+  const targetOrderId = payload.orderId || payload.activeOrderId;
+  if (targetOrderId && mongoose.Types.ObjectId.isValid(targetOrderId)) {
+    existingActiveTableOrder = await Order.findOne({
+      _id: targetOrderId,
+      restaurantId: restaurant._id,
+      status: { $in: ['placed', 'accepted', 'served'] },
+      isDeleted: false,
+    });
+  }
+  if (!existingActiveTableOrder) {
+    existingActiveTableOrder = await Order.findOne({
+      restaurantId: restaurant._id,
+      tableId: table._id,
+      status: { $in: ['placed', 'accepted', 'served'] },
+      isDeleted: false,
+    });
+  }
 
-  // If table order has been served, it is permanently LOCKED
-  if (existingActiveTableOrder && existingActiveTableOrder.status === 'served') {
-    const error = new Error('Your previous order has already been served and is locked. Please settle the bill at the counter before starting a new order.');
+  // If table order has been completed or paid, block appending to closed bill
+  if (
+    existingActiveTableOrder &&
+    (existingActiveTableOrder.status === 'completed' ||
+      ['paid', 'paid_cash', 'paid_online'].includes(existingActiveTableOrder.paymentStatus))
+  ) {
+    const error = new Error('Your previous order has already been completed. Please contact staff to start a new dining session.');
     error.statusCode = 400;
-    error.code = 'ORDER_LOCKED';
+    error.code = 'ORDER_COMPLETED';
     throw error;
   }
 
@@ -608,12 +624,18 @@ export const placeOrderService = async (payload) => {
     existingActiveTableOrder.serviceCharge = serviceCharge;
     existingActiveTableOrder.grandTotal = grandTotal;
     existingActiveTableOrder.updatedBy = 'customer';
+    // If order was previously served, move back to accepted so kitchen/staff know more food was ordered
+    if (existingActiveTableOrder.status === 'served') {
+      existingActiveTableOrder.status = 'accepted';
+    }
+    existingActiveTableOrder.kitchenStatus = 'pending';
+    existingActiveTableOrder.sendToKitchen = true;
 
     existingActiveTableOrder.statusHistory.push({
       status: existingActiveTableOrder.status,
       timestamp: new Date(),
       updatedBy: 'customer',
-      note: `Added ${validatedNewItems.length} more item(s) to table bill`,
+      note: `Added ${validatedNewItems.length} more item(s) to table bill: ${validatedNewItems.map((i) => i.itemName || i.name).join(', ')}`,
     });
 
     await existingActiveTableOrder.save();
@@ -1155,4 +1177,577 @@ export const softDeleteOrderService = async (orderId, restaurantId, userId) => {
 
   emitToRestaurant(restaurantId, 'order-updated', { orderId: order._id, isDeleted: true });
   return { message: 'Order removed' };
+};
+
+/**
+ * =========================================================================
+ * TABLE SERVICE: WAITER CALLS & WATER REQUESTS
+ * =========================================================================
+ */
+
+/**
+ * Get restaurant-configured water options with fallback presets
+ */
+export const getWaterOptionsService = async (restaurantSlug) => {
+  if (!restaurantSlug) {
+    return {
+      hasWaterItem: false,
+      waterItem: null,
+      options: [],
+      message: 'Water is currently unavailable.',
+    };
+  }
+
+  try {
+    const restaurant = await Restaurant.findOne({
+      $or: [
+        { slug: restaurantSlug.toLowerCase() },
+        { _id: mongoose.Types.ObjectId.isValid(restaurantSlug) ? restaurantSlug : null },
+      ],
+    }).select('_id').lean();
+
+    if (!restaurant) {
+      return {
+        hasWaterItem: false,
+        waterItem: null,
+        options: [],
+        message: 'Water is currently unavailable.',
+      };
+    }
+
+    // Look for explicitly configured water item
+    const waterItem = await MenuItem.findOne({
+      restaurantId: restaurant._id,
+      isWaterItem: true,
+      isDeleted: { $ne: true },
+      availability: 'available',
+    }).select('_id itemName name sellingPrice price description foodType image').lean();
+
+    if (waterItem) {
+      const price = Number(waterItem.sellingPrice) || Number(waterItem.price) || 0;
+      const formatted = {
+        id: waterItem._id.toString(),
+        menuItemId: waterItem._id.toString(),
+        name: waterItem.itemName || waterItem.name,
+        price,
+        isComplimentary: price === 0,
+        description: waterItem.description || '',
+      };
+
+      return {
+        hasWaterItem: true,
+        waterItem: formatted,
+        options: [formatted],
+        message: 'Water item available',
+      };
+    }
+  } catch (err) {
+    console.warn('[Water Options] Note:', err.message);
+  }
+
+  return {
+    hasWaterItem: false,
+    waterItem: null,
+    options: [],
+    message: 'Water is currently unavailable.',
+  };
+};
+
+/**
+ * Call Waiter Service Request
+ */
+export const requestWaiterService = async ({ orderId, restaurantSlug, tableIdentifier, customerName }) => {
+  let order = null;
+
+  if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+    order = await Order.findOne({
+      _id: orderId,
+      status: { $in: ['placed', 'accepted', 'served'] },
+      isDeleted: false,
+    });
+  }
+
+  if (!order && restaurantSlug && tableIdentifier) {
+    const restaurant = await Restaurant.findOne({ slug: restaurantSlug.toLowerCase() }).select('_id');
+    if (restaurant) {
+      const table = await resolveRestaurantTable(restaurant._id, tableIdentifier);
+      if (table) {
+        order = await Order.findOne({
+          restaurantId: restaurant._id,
+          tableId: table._id,
+          status: { $in: ['placed', 'accepted', 'served'] },
+          isDeleted: false,
+        }).sort({ createdAt: -1 });
+      }
+    }
+  }
+
+  if (!order) {
+    const error = new Error('No active dining order found for this table. Please place an order first.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // 30-Second Spam Cooldown
+  const now = Date.now();
+  const recentWaiterReq = (order.serviceRequests || []).find(
+    (r) => r.type === 'waiter' && r.status === 'pending' && now - new Date(r.requestedAt).getTime() < 30000
+  );
+
+  if (recentWaiterReq) {
+    const elapsedSec = Math.floor((now - new Date(recentWaiterReq.requestedAt).getTime()) / 1000);
+    const remainingSec = Math.max(1, 30 - elapsedSec);
+    return {
+      success: true,
+      cooldown: true,
+      remainingSeconds: remainingSec,
+      message: `Waiter already notified. Please wait ${remainingSec}s before calling again.`,
+      order,
+    };
+  }
+
+  const serviceRequest = {
+    requestId: 'srv_wtr_' + Date.now().toString(36),
+    type: 'waiter',
+    status: 'pending',
+    productName: 'Waiter Assistance',
+    quantity: 1,
+    price: 0,
+    addedToBill: false,
+    requestedAt: new Date(),
+    notes: customerName ? `Called by ${customerName}` : '',
+  };
+
+  if (!Array.isArray(order.serviceRequests)) {
+    order.serviceRequests = [];
+  }
+  order.serviceRequests.push(serviceRequest);
+
+  order.statusHistory.push({
+    status: order.status,
+    timestamp: new Date(),
+    updatedBy: 'customer',
+    note: `Customer called waiter to table ${order.tableNumber || ''}`.trim(),
+  });
+
+  await order.save();
+
+  // Socket & Notifications
+  try {
+    emitToRestaurant(order.restaurantId, 'waiter.requested', { order, serviceRequest });
+    emitToRestaurant(order.restaurantId, 'waiter:requested', { order, serviceRequest });
+    emitToRestaurant(order.restaurantId, 'order-updated', order);
+    emitToRestaurant(order.restaurantId, SOCKET_EVENTS.ORDER_UPDATED, order);
+    emitToOrder(order._id, 'waiter.requested', { order, serviceRequest });
+    emitToOrder(order._id, 'order-updated', order);
+    if (order.tableId) {
+      emitToTable(order.tableId, 'waiter.requested', { order, serviceRequest });
+    }
+
+    createRestaurantNotification({
+      restaurantId: order.restaurantId,
+      type: 'SERVICE',
+      title: `🔔 Waiter Called - Table ${order.tableNumber || 'N/A'}`,
+      message: `Table ${order.tableNumber || 'N/A'} requested waiter assistance`,
+      link: '/orders',
+      metadata: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        tableNumber: order.tableNumber,
+        serviceType: 'waiter',
+      },
+    }).catch((e) => console.warn('[Waiter Notification] Note:', e.message));
+  } catch (sErr) {
+    console.warn('[Waiter Call Socket] Note:', sErr.message);
+  }
+
+  return {
+    success: true,
+    message: 'Waiter has been notified.',
+    order,
+    serviceRequest,
+  };
+};
+
+/**
+ * Request Water Service
+ */
+export const requestWaterService = async ({
+  orderId,
+  restaurantSlug,
+  tableIdentifier,
+  productName,
+  quantity = 1,
+  price,
+  customerName = 'Guest',
+}) => {
+  let order = null;
+
+  if (orderId && mongoose.Types.ObjectId.isValid(orderId)) {
+    order = await Order.findOne({
+      _id: orderId,
+      status: { $in: ['placed', 'accepted', 'served'] },
+      isDeleted: false,
+    });
+  }
+
+  let restaurant = null;
+  let table = null;
+
+  if (order) {
+    restaurant = await Restaurant.findById(order.restaurantId).select('_id slug restaurantName');
+  } else if (restaurantSlug && tableIdentifier) {
+    restaurant = await Restaurant.findOne({
+      $or: [
+        { slug: restaurantSlug.toLowerCase() },
+        { _id: mongoose.Types.ObjectId.isValid(restaurantSlug) ? restaurantSlug : null },
+      ],
+    }).select('_id slug restaurantName');
+
+    if (restaurant) {
+      table = await resolveRestaurantTable(restaurant._id, tableIdentifier);
+      if (table) {
+        order = await Order.findOne({
+          restaurantId: restaurant._id,
+          tableId: table._id,
+          status: { $in: ['placed', 'accepted', 'served'] },
+          isDeleted: false,
+        }).sort({ createdAt: -1 });
+      }
+    }
+  }
+
+  // If table has no order yet, create initial table dining order so request is never dropped
+  if (!order) {
+    if (restaurant && table) {
+      const nextOrderNum = await getNextOrderNumber();
+      order = await Order.create({
+        restaurantId: restaurant._id,
+        tableId: table._id,
+        tableNumber: table.tableNumber,
+        orderNumber: nextOrderNum,
+        customerName: customerName || 'Guest',
+        status: 'placed',
+        paymentStatus: 'pending',
+        paymentMethod: 'cash',
+        items: [],
+        subtotal: 0,
+        discount: 0,
+        tax: 0,
+        serviceCharge: 0,
+        grandTotal: 0,
+        serviceRequests: [],
+      });
+    } else {
+      const error = new Error('No active dining order found for this table. Please place an order first.');
+      error.statusCode = 404;
+      throw error;
+    }
+  }
+
+  const restId = order ? order.restaurantId : restaurant?._id;
+  // Automatically find restaurant's configured water item
+  const waterItem = await MenuItem.findOne({
+    restaurantId: restId,
+    isWaterItem: true,
+    isDeleted: { $ne: true },
+    availability: 'available',
+  });
+
+  if (!waterItem) {
+    const error = new Error('Water is currently unavailable. No water item configured.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const validQty = Math.max(1, parseInt(quantity, 10) || 1);
+  const waterPrice = Number(waterItem.sellingPrice) || Number(waterItem.price) || 0;
+  const waterName = waterItem.itemName || productName || 'Water Bottle';
+
+  const serviceRequest = {
+    requestId: 'srv_wtr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+    type: 'water',
+    status: 'pending',
+    menuItemId: waterItem._id,
+    productName: waterName,
+    quantity: validQty,
+    price: waterPrice,
+    addedToBill: false,
+    requestedByGuest: true,
+    requestedAt: new Date(),
+    notes: `${validQty}x ${waterName}${waterPrice > 0 ? ` (₹${waterPrice * validQty})` : ' (Complimentary)'}`,
+  };
+
+  if (!Array.isArray(order.serviceRequests)) {
+    order.serviceRequests = [];
+  }
+  order.serviceRequests.push(serviceRequest);
+
+  order.statusHistory.push({
+    status: order.status,
+    timestamp: new Date(),
+    updatedBy: 'customer',
+    note: `Water requested: ${validQty}x ${waterName}${waterPrice > 0 ? ` (₹${waterPrice * validQty})` : ' (Complimentary)'}`,
+  });
+
+  await order.save();
+
+  // Socket & Notifications
+  try {
+    const socketPayload = {
+      restaurantId: order.restaurantId,
+      tableNumber: order.tableNumber,
+      orderId: order._id,
+      quantity: validQty,
+      serviceRequestId: serviceRequest.requestId,
+      productName: waterName,
+      price: waterPrice,
+      status: 'pending',
+      order,
+      serviceRequest,
+    };
+
+    emitToRestaurant(order.restaurantId, 'water.requested', socketPayload);
+    emitToRestaurant(order.restaurantId, 'water:requested', socketPayload);
+    emitToRestaurant(order.restaurantId, 'order-updated', order);
+    emitToRestaurant(order.restaurantId, SOCKET_EVENTS.ORDER_UPDATED, order);
+    emitToOrder(order._id, 'water.requested', socketPayload);
+    emitToOrder(order._id, 'order-updated', order);
+    if (order.tableId) {
+      emitToTable(order.tableId, 'water.requested', socketPayload);
+    }
+
+    createRestaurantNotification({
+      restaurantId: order.restaurantId,
+      type: 'SERVICE',
+      title: `💧 Water Requested - Table ${order.tableNumber || 'N/A'}`,
+      message: `Table ${order.tableNumber || 'N/A'} requested ${validQty}x ${waterName}`,
+      link: '/orders',
+      metadata: {
+        orderId: order._id,
+        orderNumber: order.orderNumber,
+        tableNumber: order.tableNumber,
+        serviceType: 'water',
+      },
+    }).catch((e) => console.warn('[Water Notification] Note:', e.message));
+  } catch (sErr) {
+    console.warn('[Water Socket] Note:', sErr.message);
+  }
+
+  return {
+    success: true,
+    message: 'Water request sent to staff!',
+    order,
+    serviceRequest,
+  };
+};
+
+/**
+ * Handle Service Request (Staff Action from Live Orders Card)
+ */
+export const handleServiceRequestService = async ({ orderId, restaurantId, requestId, action, user }) => {
+  const restId = typeof restaurantId === 'string' ? new mongoose.Types.ObjectId(restaurantId) : restaurantId;
+  const order = await Order.findOne({ _id: orderId, restaurantId: restId, isDeleted: false });
+
+  if (!order) {
+    const error = new Error('Order not found or unauthorized');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!Array.isArray(order.serviceRequests) || order.serviceRequests.length === 0) {
+    const error = new Error('No service requests found for this order');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Find target service request
+  let srv = order.serviceRequests.find((r) => r.requestId === requestId || r._id?.toString() === requestId);
+  if (!srv) {
+    // Fallback: match by action type
+    if (action === 'handled') {
+      srv = order.serviceRequests.slice().reverse().find((r) => r.type === 'waiter' && r.status === 'pending');
+    } else if (action === 'served' || action === 'add_to_bill') {
+      srv = order.serviceRequests.slice().reverse().find((r) => r.type === 'water' && r.status === 'pending');
+    }
+  }
+
+  if (!srv) {
+    const error = new Error('Service request not found or already processed');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const staffName = user?.name || user?.email || 'Staff';
+
+  if (srv.type === 'waiter' || action === 'handled') {
+    srv.status = 'handled';
+    srv.handledAt = new Date();
+    srv.handledBy = staffName;
+
+    order.statusHistory.push({
+      status: order.status,
+      timestamp: new Date(),
+      updatedBy: staffName,
+      note: `Waiter call handled by ${staffName}`,
+    });
+
+    try {
+      emitToRestaurant(restId, 'waiter.handled', { order, serviceRequest: srv });
+      emitToRestaurant(restId, 'waiter:handled', { order, serviceRequest: srv });
+      emitToRestaurant(restId, 'order-updated', order);
+      emitToRestaurant(restId, SOCKET_EVENTS.ORDER_UPDATED, order);
+      emitToOrder(order._id, 'waiter.handled', { order, serviceRequest: srv });
+      emitToOrder(order._id, 'order-updated', order);
+    } catch (e) {}
+  } else if (srv.type === 'water' || action === 'served' || action === 'add_to_bill' || action === 'dismiss') {
+    if (action === 'dismiss') {
+      srv.status = 'cancelled';
+      srv.handledAt = new Date();
+      srv.handledBy = staffName;
+
+      order.statusHistory.push({
+        status: order.status,
+        timestamp: new Date(),
+        updatedBy: staffName,
+        note: `Water request dismissed by ${staffName}`,
+      });
+
+      try {
+        emitToRestaurant(restId, 'order-updated', order);
+        emitToRestaurant(restId, SOCKET_EVENTS.ORDER_UPDATED, order);
+        emitToOrder(order._id, 'order-updated', order);
+      } catch (e) {}
+
+      await order.save();
+
+      return {
+        success: true,
+        message: 'Water request dismissed',
+        order,
+        serviceRequest: srv,
+      };
+    }
+
+    if (action === 'served') {
+      srv.status = 'served';
+      srv.handledAt = new Date();
+      srv.handledBy = staffName;
+    }
+
+    // When Add To Bill, insert that SAME configured Menu Item into the existing order
+    if (action === 'add_to_bill') {
+      let waterMenuItem = null;
+      if (srv.menuItemId) {
+        waterMenuItem = await MenuItem.findOne({
+          _id: srv.menuItemId,
+          restaurantId: order.restaurantId,
+          isDeleted: { $ne: true },
+        });
+      }
+      if (!waterMenuItem) {
+        waterMenuItem = await MenuItem.findOne({
+          restaurantId: order.restaurantId,
+          isWaterItem: true,
+          isDeleted: { $ne: true },
+        });
+      }
+
+      if (!waterMenuItem) {
+        const error = new Error('No Water Item Configured. Please configure a water item in Menu Items.');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      const origPrice = Number(waterMenuItem.price) || 0;
+      const sellPrice = Number(waterMenuItem.sellingPrice) || origPrice;
+      const qty = Math.max(1, parseInt(srv.quantity, 10) || 1);
+
+      // Insert that exact Menu Item into order.items
+      order.items.push({
+        itemId: waterMenuItem._id,
+        menuItemId: waterMenuItem._id,
+        itemName: waterMenuItem.itemName,
+        name: waterMenuItem.itemName,
+        originalPrice: origPrice,
+        price: origPrice,
+        sellingPrice: sellPrice,
+        quantity: qty,
+        foodType: waterMenuItem.foodType || 'veg',
+        specialInstructions: 'Water Bottle',
+        image: getImageUrl(waterMenuItem.image),
+      });
+
+      let fullSubtotal = 0;
+      let fullDiscount = 0;
+      for (const item of order.items) {
+        const orig = Number(item.originalPrice) || Number(item.sellingPrice) || 0;
+        const sell = Number(item.sellingPrice) || orig;
+        const q = item.quantity || 1;
+        fullSubtotal += orig * q;
+        fullDiscount += (orig - sell) * q;
+      }
+
+      fullSubtotal = Math.round(fullSubtotal * 100) / 100;
+      fullDiscount = Math.round(fullDiscount * 100) / 100;
+      const taxableAmount = Math.max(0, fullSubtotal - fullDiscount);
+
+      const settings = (await RestaurantSettings.findOne({ restaurantId: order.restaurantId }).lean()) || {};
+      const gstPercent = settings.gstEnabled !== false ? Number(settings.gstPercentage) || 0 : 0;
+      const tax = Math.round(taxableAmount * (gstPercent / 100) * 100) / 100;
+
+      let serviceCharge = 0;
+      if (settings.serviceChargeEnabled) {
+        if (settings.serviceChargeType === 'percentage') {
+          serviceCharge = Math.round(taxableAmount * ((Number(settings.serviceChargeValue) || 0) / 100) * 100) / 100;
+        } else {
+          serviceCharge = Math.round((Number(settings.serviceChargeValue) || 0) * 100) / 100;
+        }
+      }
+
+      const grandTotal = Math.round((taxableAmount + tax + serviceCharge) * 100) / 100;
+
+      order.subtotal = fullSubtotal;
+      order.discount = fullDiscount;
+      order.tax = tax;
+      order.serviceCharge = serviceCharge;
+      order.grandTotal = grandTotal;
+      srv.addedToBill = true;
+      srv.status = 'served';
+      srv.handledAt = new Date();
+      srv.handledBy = staffName;
+
+      order.statusHistory.push({
+        status: order.status,
+        timestamp: new Date(),
+        updatedBy: staffName,
+        note: `Water added to bill by ${staffName}: ${qty}x ${waterMenuItem.itemName} (₹${sellPrice * qty})`,
+      });
+    } else {
+      order.statusHistory.push({
+        status: order.status,
+        timestamp: new Date(),
+        updatedBy: staffName,
+        note: `Water served to table by ${staffName}`,
+      });
+    }
+
+    try {
+      emitToRestaurant(restId, 'water.served', { order, serviceRequest: srv });
+      emitToRestaurant(restId, 'water:served', { order, serviceRequest: srv });
+      emitToRestaurant(restId, 'order-updated', order);
+      emitToRestaurant(restId, SOCKET_EVENTS.ORDER_UPDATED, order);
+      emitToOrder(order._id, 'water.served', { order, serviceRequest: srv });
+      emitToOrder(order._id, 'order-updated', order);
+    } catch (e) {}
+  }
+
+  await order.save();
+
+  return {
+    success: true,
+    message: action === 'add_to_bill' ? 'Water added to bill' : (srv.type === 'waiter' ? 'Waiter call marked handled' : 'Water served'),
+    order,
+    serviceRequest: srv,
+  };
 };

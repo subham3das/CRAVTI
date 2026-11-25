@@ -438,6 +438,11 @@ export const Menu = () => {
                                 <p className="text-sm font-semibold text-slate-900 truncate">
                                   {item.itemName}
                                 </p>
+                                {item.isWaterItem && (
+                                  <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                                    💧 Water Item
+                                  </span>
+                                )}
                                 {item.popular && (
                                   <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
                                     ★ Popular
@@ -583,6 +588,11 @@ export const Menu = () => {
                       <h4 className="text-sm font-semibold text-slate-900 truncate">
                         {item.itemName}
                       </h4>
+                      {item.isWaterItem && (
+                        <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200 shrink-0">
+                          💧 Water
+                        </span>
+                      )}
                       {item.popular && (
                         <span className="text-[10px] font-bold bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
                           ★ Popular

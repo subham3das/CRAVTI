@@ -12,6 +12,10 @@ import {
   getHistoricalOrders,
   getOrderMetrics,
   softDeleteOrder,
+  callWaiter,
+  requestWater,
+  getWaterOptions,
+  handleServiceRequest,
 } from '../controllers/orderController.js';
 import {
   getCustomerCategories,
@@ -52,6 +56,16 @@ router.get('/detail/:id', getOrderById);
 router.get('/receipt/:id', getOrderReceipt);
 router.get('/:id/receipt', getOrderReceipt);
 
+// Customer Table Service: Water & Waiter calls
+router.get('/service/water-options/:restaurantSlug', getWaterOptions);
+router.get('/service/water-options', getWaterOptions);
+router.post('/service/waiter', callWaiter);
+router.post('/service/water', requestWater);
+router.post('/request-water', requestWater);
+router.post('/:orderId/waiter', callWaiter);
+router.post('/:orderId/water', requestWater);
+router.post('/:orderId/request-water', requestWater);
+
 // ==========================================
 // Authenticated Restaurant Order Management
 // ==========================================
@@ -60,6 +74,8 @@ router.get('/history', protect, requireRestaurant, verifySubscription, getHistor
 router.get('/metrics', protect, requireRestaurant, verifySubscription, getOrderMetrics);
 router.patch('/:id/status', protect, requireRestaurant, verifySubscription, updateOrderStatus);
 router.patch('/:id/payment', protect, requireRestaurant, verifySubscription, updatePaymentStatus);
+router.patch('/:orderId/service/:requestId', protect, requireRestaurant, verifySubscription, handleServiceRequest);
+router.patch('/:orderId/service', protect, requireRestaurant, verifySubscription, handleServiceRequest);
 router.delete('/:id', protect, requireRestaurant, verifySubscription, softDeleteOrder);
 
 // GET /api/orders (Plural) - Smart route supporting Admin or Restaurant Owner

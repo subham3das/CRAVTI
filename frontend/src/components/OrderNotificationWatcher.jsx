@@ -139,10 +139,84 @@ export const OrderNotificationWatcher = () => {
       }
     };
 
+    // Unified customer table service event handler (Waiter Call / Water Request)
+    const handleServiceRequestEvent = (payload) => {
+      if (!payload) return;
+
+      const isWater = payload.type === 'water' || Boolean(payload.productName);
+      const reqKey = payload.requestId || (payload.orderId ? `${payload.orderId}-${isWater ? 'water' : 'waiter'}` : String(Date.now()));
+
+      if (processedOrderIdsRef.current.has(reqKey)) {
+        return;
+      }
+      processedOrderIdsRef.current.add(reqKey);
+      setTimeout(() => {
+        processedOrderIdsRef.current.delete(reqKey);
+      }, 15000);
+
+      // Play Notification Sound
+      const soundEnabled = settings?.notificationSound !== false;
+      if (soundEnabled) {
+        unlockAudio();
+        playNewOrderSound();
+      }
+
+      // Display Rich Toast Notification
+      const tableInfo = payload.tableNumber ? `Table T${payload.tableNumber}` : 'Dining Table';
+      const title = isWater ? `💧 Water Requested (${tableInfo})` : `🔔 Waiter Call (${tableInfo})`;
+      const desc = isWater
+        ? `${payload.quantity || 1}× ${payload.productName || 'Water'}${payload.price > 0 ? ` (₹${payload.price * (payload.quantity || 1)})` : ' (Complimentary)'}`
+        : `${payload.customerName || 'Customer'} called for waiter assistance`;
+
+      toast(
+        (t) => (
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => {
+              toast.dismiss(t.id);
+              if (typeof window !== 'undefined' && window.location.pathname !== '/orders') {
+                window.location.href = '/orders';
+              }
+            }}
+          >
+            <span className="text-xl">{isWater ? '💧' : '🔔'}</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-slate-900 text-sm">{title}</span>
+              <span className="text-xs text-slate-500">{desc}</span>
+            </div>
+          </div>
+        ),
+        {
+          duration: 7000,
+          position: 'top-right',
+          style: {
+            borderLeft: isWater ? '4px solid #2563EB' : '4px solid #D97706',
+            background: '#FFFFFF',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+          },
+        }
+      );
+
+      // Desktop Background Notification
+      showBackgroundDesktopNotification({
+        title: `CRAVITI: ${title}`,
+        body: desc,
+      });
+
+      // Dispatch custom event for Orders page
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent('craviti:service-requested', { detail: payload })
+        );
+      }
+    };
+
     // Listen to all canonical new order events from backend
     socket.on('new-order', handleIncomingOrder);
     socket.on('order.created', handleIncomingOrder);
     socket.on('manual-order-created', handleIncomingOrder);
+    socket.on('waiter.requested', handleServiceRequestEvent);
+    socket.on('water.requested', handleServiceRequestEvent);
 
     return () => {
       socket.off('connect', joinRooms);
@@ -150,6 +224,8 @@ export const OrderNotificationWatcher = () => {
       socket.off('new-order', handleIncomingOrder);
       socket.off('order.created', handleIncomingOrder);
       socket.off('manual-order-created', handleIncomingOrder);
+      socket.off('waiter.requested', handleServiceRequestEvent);
+      socket.off('water.requested', handleServiceRequestEvent);
       socket.disconnect();
       socketRef.current = null;
     };

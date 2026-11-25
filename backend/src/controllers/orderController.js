@@ -13,6 +13,10 @@ import {
   getOrderMetricsService,
   softDeleteOrderService,
   generateReceiptSnapshot,
+  requestWaiterService,
+  requestWaterService,
+  handleServiceRequestService,
+  getWaterOptionsService,
 } from '../services/orderService.js';
 import { Receipt } from '../models/Receipt.js';
 import { Order } from '../models/Order.js';
@@ -226,4 +230,65 @@ export const getOrderMetrics = asyncHandler(async (req, res) => {
 export const softDeleteOrder = asyncHandler(async (req, res) => {
   const result = await softDeleteOrderService(req.params.id, req.restaurantId, req.user._id);
   return sendSuccess(res, 'Order deleted successfully', result, HTTP_STATUS.OK, result);
+});
+
+/**
+ * =========================================================================
+ * TABLE SERVICE CONTROLLERS (WAITER & WATER)
+ * =========================================================================
+ */
+
+export const getWaterOptions = asyncHandler(async (req, res) => {
+  const { restaurantSlug } = req.params;
+  const result = await getWaterOptionsService(restaurantSlug);
+  return sendSuccess(res, 'Water options fetched successfully', result, HTTP_STATUS.OK, {
+    options: result.options,
+    hasWaterItem: result.hasWaterItem,
+    waterItem: result.waterItem,
+  });
+});
+
+export const callWaiter = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { restaurantSlug, tableIdentifier, customerName } = req.body;
+  const result = await requestWaiterService({
+    orderId: orderId || req.body.orderId,
+    restaurantSlug,
+    tableIdentifier: tableIdentifier || req.body.tableId || req.body.tableNumber,
+    customerName,
+  });
+
+  return sendSuccess(res, result.message, result, HTTP_STATUS.OK, result);
+});
+
+export const requestWater = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { restaurantSlug, tableIdentifier, productName, quantity, price, customerName } = req.body;
+  const result = await requestWaterService({
+    orderId: orderId || req.body.orderId,
+    restaurantSlug,
+    tableIdentifier: tableIdentifier || req.body.tableId || req.body.tableNumber,
+    productName,
+    quantity,
+    price,
+    customerName,
+  });
+
+  return sendSuccess(res, result.message, result, HTTP_STATUS.OK, result);
+});
+
+export const handleServiceRequest = asyncHandler(async (req, res) => {
+  const { orderId, requestId } = req.params;
+  const { action } = req.body; // 'handled' | 'served' | 'add_to_bill'
+  const restaurantId = req.restaurantId || req.restaurant?._id || req.user?.restaurantId;
+
+  const result = await handleServiceRequestService({
+    orderId,
+    restaurantId,
+    requestId,
+    action: action || 'handled',
+    user: req.user,
+  });
+
+  return sendSuccess(res, result.message, result, HTTP_STATUS.OK, result);
 });

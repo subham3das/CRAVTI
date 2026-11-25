@@ -16,7 +16,13 @@ import {
   FiPlus,
 } from 'react-icons/fi';
 import { MdQrCodeScanner, MdRestaurantMenu } from 'react-icons/md';
-import { fetchCustomerMenuApi, placeCustomerOrderApi } from '../services/orderService';
+import {
+  fetchCustomerMenuApi,
+  placeCustomerOrderApi,
+  callWaiterApi,
+  requestWaterApi,
+  fetchWaterOptionsApi,
+} from '../services/orderService';
 import { createPaymentOrderApi, verifyPaymentApi } from '../services/paymentService';
 import { openRazorpayModal } from '../utils/razorpay';
 import { CustomerCartProvider, useCustomerCart } from '../context/CustomerCartContext';
@@ -25,6 +31,12 @@ import { CustomerItemModal } from '../components/customer/CustomerItemModal';
 import { CustomerCartDrawer } from '../components/customer/CustomerCartDrawer';
 import { CustomerOrderSuccessModal } from '../components/customer/CustomerOrderSuccessModal';
 import { CustomerFooter } from '../components/customer/CustomerFooter';
+import {
+  CallWaiterModal,
+  RequestWaterModal,
+  NoActiveOrderModal,
+  CustomerQuickActionBar,
+} from '../components/customer/TableServiceModals';
 import { ImageWithFallback } from '../components/ImageWithFallback';
 import { getImageUrl } from '../utils/image';
 import {
@@ -35,6 +47,8 @@ import {
   setGuestId,
   saveTableSession,
   getTableSession,
+  saveActiveOrderSession,
+  getActiveOrderSession,
 } from '../utils/guestSession';
 import { formatCurrency } from '../utils/formatters';
 import toast from 'react-hot-toast';
@@ -74,7 +88,9 @@ const CustomerMenuContent = () => {
   const [settings, setSettings] = useState(null);
   const [isOrderLocked, setIsOrderLocked] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
-  const [dismissActivePrompt, setDismissActivePrompt] = useState(false);
+  const [dismissActivePrompt, setDismissActivePrompt] = useState(
+    () => typeof window !== 'undefined' && window.location.search.includes('add_more')
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -89,6 +105,119 @@ const CustomerMenuContent = () => {
   const [placedOrder, setPlacedOrder] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [stickyPaymentMethod, setStickyPaymentMethod] = useState('cash');
+
+  // Customer Table Service states
+  const [isCallWaiterOpen, setIsCallWaiterOpen] = useState(false);
+  const [isRequestWaterOpen, setIsRequestWaterOpen] = useState(false);
+  const [isNoActiveOrderOpen, setIsNoActiveOrderOpen] = useState(false);
+  const [waterOptions, setWaterOptions] = useState([]);
+  const [waiterCooldown, setWaiterCooldown] = useState(0);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  const [isRequestingWater, setIsRequestingWater] = useState(false);
+
+  // Waiter Cooldown Timer (30 seconds)
+  useEffect(() => {
+    if (waiterCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setWaiterCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [waiterCooldown]);
+
+  // Fetch Water Options
+  const handleOpenWaterModal = async () => {
+    setIsRequestWaterOpen(true);
+    try {
+      const res = await fetchWaterOptionsApi(restaurantSlug);
+      if (res.success && res.data) {
+        setWaterOptions(res.data);
+      }
+    } catch (err) {
+      console.warn('Failed to load water options:', err);
+    }
+  };
+
+  // Live Order Button Handler (Always Visible)
+  const handleLiveOrderClick = () => {
+    const liveOrder = activeOrder || getActiveOrderSession();
+    if (liveOrder?._id) {
+      navigate(`/order/track/${liveOrder._id}`);
+    } else {
+      setIsNoActiveOrderOpen(true);
+    }
+  };
+
+  // Add More Items Handler (when clicked on Menu page)
+  const handleAddMoreClick = () => {
+    const menuEl = document.querySelector('main') || document.getElementById('menu-items-section');
+    if (menuEl) {
+      menuEl.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 320, behavior: 'smooth' });
+    }
+    toast('Browse menu dishes below and add items to your active order.', {
+      icon: '➕',
+      duration: 3500,
+    });
+  };
+
+  // Call Waiter API Handler
+  const handleCallWaiterConfirm = async () => {
+    if (isCallingWaiter || waiterCooldown > 0) return;
+    try {
+      setIsCallingWaiter(true);
+      const effectiveTableIdentifier = table?.tableNumber || activeTable;
+      const res = await callWaiterApi({
+        orderId: activeOrder?._id,
+        restaurantSlug,
+        tableIdentifier: effectiveTableIdentifier,
+        customerName: activeOrder?.customerName || 'Guest',
+      });
+      if (res.success) {
+        toast.success(res.message || 'Waiter has been notified.');
+        setWaiterCooldown(30);
+        setIsCallWaiterOpen(false);
+      } else {
+        toast.error(res.message || 'Failed to call waiter');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to call waiter');
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
+
+  // Request Water API Handler
+  const handleWaterSubmit = async ({ productName, quantity, price }) => {
+    if (isRequestingWater) return;
+    try {
+      setIsRequestingWater(true);
+      const effectiveTableIdentifier = table?.tableNumber || activeTable;
+      const res = await requestWaterApi({
+        orderId: activeOrder?._id,
+        restaurantSlug,
+        tableIdentifier: effectiveTableIdentifier,
+        productName,
+        quantity,
+        price,
+        customerName: activeOrder?.customerName || 'Guest',
+      });
+      if (res.success) {
+        toast.success(res.message || 'Water request sent!');
+        if (res.order) {
+          setActiveOrder(res.order);
+          saveActiveOrderSession(res.order);
+        }
+        setIsRequestWaterOpen(false);
+      } else {
+        toast.error(res.message || 'Failed to request water');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to request water');
+    } finally {
+      setIsRequestingWater(false);
+    }
+  };
 
   // Category refs for smooth scrolling
   const categorySectionRefs = useRef({});
@@ -157,6 +286,10 @@ const CustomerMenuContent = () => {
           setWaitingForPayment(paymentWaiting);
           if (activeOrderData) {
             setActiveOrder(activeOrderData);
+            saveActiveOrderSession(activeOrderData);
+          } else {
+            setActiveOrder(null);
+            saveActiveOrderSession(null);
           }
           // Live sync cart items with latest prices and availability
           if (typeof syncCartRef.current === 'function') {
@@ -394,8 +527,12 @@ const CustomerMenuContent = () => {
       // Generates Razorpay Order first without DB order.
       // Order created in DB ONLY after successful HMAC signature verification.
       // If cancelled or failed: Cart is 100% preserved, no order created.
+      const targetOrderId = activeOrder?._id || getActiveOrderSession()?._id;
+
       if (paymentMethod === 'online') {
         const paymentPayload = {
+          orderId: targetOrderId,
+          activeOrderId: targetOrderId,
           restaurantSlug: effectiveSlug,
           restaurantId: restaurant?._id || storedSession?.restaurantId,
           tableId: effectiveTableId || effectiveTableIdentifier,
@@ -497,6 +634,8 @@ const CustomerMenuContent = () => {
       // FLOW B: CASH PAYMENT (POSTPAY)
       // Places order immediately with status: placed, paymentStatus: pending, cashierStatus: unpaid
       const orderPayload = {
+        orderId: targetOrderId,
+        activeOrderId: targetOrderId,
         restaurantSlug: effectiveSlug,
         restaurantId: restaurant?._id || storedSession?.restaurantId,
         tableId: effectiveTableId || effectiveTableIdentifier,
@@ -521,6 +660,7 @@ const CustomerMenuContent = () => {
         clearCart();
         setIsCartOpen(false);
         setActiveOrder(res.order);
+        saveActiveOrderSession(res.order);
         setPlacedOrder(res.order);
         toast.success(res.appended ? 'Items added to your active bill!' : 'Order placed successfully! Pay at counter.');
       } else {
@@ -1115,6 +1255,43 @@ const CustomerMenuContent = () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Floating Customer Quick Actions Bar: Call Waiter, Request Water, Add More, Live Order */}
+      <CustomerQuickActionBar
+        onCallWaiter={() => setIsCallWaiterOpen(true)}
+        onRequestWater={handleOpenWaterModal}
+        onAddMore={handleAddMoreClick}
+        onLiveOrder={handleLiveOrderClick}
+        hasActiveOrder={Boolean(activeOrder && activeOrder._id)}
+        waiterCooldown={waiterCooldown}
+        className={totalCount > 0 ? 'bottom-[88px] sm:bottom-[80px]' : 'bottom-4'}
+      />
+
+      {/* Table Service Modals */}
+      <CallWaiterModal
+        isOpen={isCallWaiterOpen}
+        onClose={() => setIsCallWaiterOpen(false)}
+        onConfirm={handleCallWaiterConfirm}
+        cooldown={waiterCooldown}
+        isLoading={isCallingWaiter}
+        tableNumber={table?.tableNumber || activeTable}
+      />
+
+      <RequestWaterModal
+        isOpen={isRequestWaterOpen}
+        onClose={() => setIsRequestWaterOpen(false)}
+        onSubmit={handleWaterSubmit}
+        onSubmitWater={handleWaterSubmit}
+        options={waterOptions}
+        waterOptions={waterOptions}
+        isLoading={isRequestingWater}
+        tableNumber={table?.tableNumber || activeTable}
+      />
+
+      <NoActiveOrderModal
+        isOpen={isNoActiveOrderOpen}
+        onClose={() => setIsNoActiveOrderOpen(false)}
+      />
     </div>
   );
 };

@@ -27,6 +27,7 @@ export const OrderDetailsModal = ({
   onClose,
   onStatusChange,
   onPaymentChange,
+  onServiceAction,
   restaurantName,
 }) => {
   const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
@@ -185,6 +186,85 @@ export const OrderDetailsModal = ({
                 )}
               </div>
             </div>
+
+            {/* Table Service Requests (Waiter Calls / Water Requests) */}
+            {Array.isArray(order.serviceRequests) && order.serviceRequests.length > 0 && (
+              <div>
+                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-400 mb-2">
+                  Table Service Requests
+                </h4>
+                <div className="space-y-2">
+                  {order.serviceRequests.map((req) => (
+                    <div
+                      key={req.requestId || req._id}
+                      className="p-3 rounded-xl border border-slate-200 bg-white flex items-center justify-between gap-3"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl">{req.type === 'waiter' ? '🔔' : '💧'}</span>
+                        <div>
+                          <p className="font-bold text-xs text-slate-900">
+                            {req.type === 'waiter'
+                              ? 'Waiter Call'
+                              : `Water Request: ${req.quantity || 1}× ${req.productName || 'Water'}`}
+                          </p>
+                          <p className="text-[11px] text-slate-400">
+                            {req.status === 'pending'
+                              ? 'Pending assistance'
+                              : req.status === 'handled'
+                              ? `Handled by ${req.handledBy || 'staff'}`
+                              : `Served by ${req.handledBy || 'staff'}`}
+                            {req.price > 0 && ` • ₹${req.price * (req.quantity || 1)}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {req.status === 'pending' && onServiceAction ? (
+                        <div className="flex items-center gap-1.5">
+                          {req.type === 'waiter' ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                onServiceAction(order._id, req.requestId || req._id, 'handled')
+                              }
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                            >
+                              Mark Handled
+                            </button>
+                          ) : (
+                            <>
+                              {!req.addedToBill && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onServiceAction(order._id, req.requestId || req._id, 'add_to_bill')
+                                  }
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:scale-95 transition-all shadow-xs cursor-pointer"
+                                >
+                                  Add To Bill
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  onServiceAction(order._id, req.requestId || req._id, 'dismiss')
+                                }
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 active:scale-95 transition-all shadow-xs cursor-pointer"
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          ✓ {req.addedToBill ? 'Added to Bill' : req.status === 'handled' ? 'Handled' : req.status === 'cancelled' ? 'Dismissed' : 'Served'}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Ordered Dishes List */}
             <div>

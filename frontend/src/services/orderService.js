@@ -38,9 +38,21 @@ export const fetchCustomerOrderTrackApi = (orderId) =>
 export const fetchOrderReceiptApi = (orderId) =>
   publicApi.get(`/order/receipt/${orderId}`).then((r) => r.data);
 
+export const callWaiterApi = (payload) =>
+  publicApi.post('/order/service/waiter', payload).then((r) => r.data);
+
+export const requestWaterApi = (payload) =>
+  publicApi.post('/order/service/water', payload).then((r) => r.data);
+
+export const fetchWaterOptionsApi = (restaurantSlug) =>
+  publicApi.get(`/order/service/water-options/${restaurantSlug}`).then((r) => r.data);
+
 /**
  * Authenticated Restaurant Management APIs
  */
+
+export const handleServiceRequestApi = (orderId, requestId, action = 'handled') =>
+  api.patch(`/orders/${orderId}/service/${requestId}`, { action }).then((r) => r.data);
 
 export const updateOrderStatusApi = (orderId, status, note = '') =>
   api.patch(`/orders/${orderId}/status`, { status, note }).then(r => r.data);
